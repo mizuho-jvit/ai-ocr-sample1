@@ -141,3 +141,27 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# others
+/input
+/output
+.claude/
+/inbox
+
+# OKF: raw 層（第1層）は追跡しない - knowledge/SCHEMA.md §2 参照
+/knowledge/ref/
+
+# 実行環境がリポジトリ直下に生成するダミー dotfile（/dev/null へのキャラクタデバイス）。
+# プロジェクトの成果物ではないため追跡しない。実ファイルとして必要になったら
+# git add -f で明示的に追加する（特に submodule 導入時の .gitmodules に注意）。
+/.bashrc
+/.bash_profile
+/.profile
+/.zshrc
+/.zprofile
+/.gitconfig
+/.ripgreprc
+/.gitmodules
+/.mcp.json
+/.idea
+/.vscode
