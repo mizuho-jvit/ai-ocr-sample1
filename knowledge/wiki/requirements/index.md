@@ -2,7 +2,7 @@
 
 <!-- 予約ファイル。フロントマターは付けない（SCHEMA.md §3.3）。 -->
 
-AI-OCR 帳票読取・一次審査システム（営業デモ用）の要件。正典化元は要件定義書 v1.10（`knowledge/ref/doc/claude_code_要件定義_v1.10.md`）で、**確定済み・未確定事項なし**。OCR構成はMVP 1.0をGemini単体、MVP 1.1をDocument AI＋Geminiとする。
+AI-OCR 帳票読取・一次審査システム（営業デモ用）の要件。正典化元は要件定義書 v1.11（`knowledge/ref/doc/claude_code_要件定義_v1.11.md`）で、**確定済み・未確定事項なし**。OCR構成はMVP 1.0をGemini単体、MVP 1.1をDocument AI＋Geminiとする。
 
 | ページ | 元の章 | 内容 |
 |---|---|---|

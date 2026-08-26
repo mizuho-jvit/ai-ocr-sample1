@@ -8,7 +8,7 @@ timestamp: 2026-08-20T00:00:00Z
 
 # 非機能要件（性能・セキュリティ・データ保持・保守性）
 
-> 正典化元: 要件定義書 v1.10 §7.1〜§7.4（原本は `knowledge/ref/doc/claude_code_要件定義_v1.10.md`）
+> 正典化元: 要件定義書 v1.11 §7.1〜§7.4（原本は `knowledge/ref/doc/claude_code_要件定義_v1.11.md`）
 > テナント分離（§7.5）は分量が大きいため [テナント分離](./tenant-isolation.md) に分離した。
 
 ## 性能

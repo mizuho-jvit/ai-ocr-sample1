@@ -8,7 +8,7 @@ timestamp: 2026-08-20T00:00:00Z
 
 # システム構成（Cloudflare 無料枠）
 
-> 正典化元: 要件定義書 v1.10 §4（原本は `knowledge/ref/doc/claude_code_要件定義_v1.10.md`）
+> 正典化元: 要件定義書 v1.11 §4（原本は `knowledge/ref/doc/claude_code_要件定義_v1.11.md`）
 
 ## 全体構成
 
@@ -24,6 +24,8 @@ timestamp: 2026-08-20T00:00:00Z
    ├ /api/applications/*  申請CRUD・ステータス遷移
    ├ /api/members/*     会員CRUD・検索・名寄せ第1段
    ├ /api/staff/*       スタッフ管理（admin のみ）
+   ├ /api/usage         当月のAI利用量（残り読取可能枚数）
+   ├ /api/demo/reset    デモデータのリセット（admin のみ）
    ├ /api/ocr/extract  ─┼→ [OCR Pipeline]
    │                      ├ MVP 1.0: [AI Gateway] → Gemini API
    │                      └ MVP 1.1: Document AI Enterprise OCR
@@ -34,6 +36,10 @@ timestamp: 2026-08-20T00:00:00Z
                         └→ [D1] 業務データ
 ```
 
+**上図は概略である。** メソッド・パス・要求／応答・ステータスコードを含む網羅的な一覧は
+[APIエンドポイント仕様](./api.md)が正典であり、CSV入出力（F-8）等はそちらにのみ記載する。
+処理の順序は [データフロー](./dataflow.md)、SPA と Worker が共有する型は [共有型定義](./types.md)。
+
 ## 技術スタック
 
 | レイヤ | 採用技術 | 選定理由 |
@@ -43,7 +49,7 @@ timestamp: 2026-08-20T00:00:00Z
 | データベース | Cloudflare D1（SQLite互換） | 無料枠で利用可。SQLiteベースのため既存設計をそのまま適用できる |
 | ORM | Drizzle ORM | D1ネイティブ対応。Prisma に比べバンドルサイズが小さい |
 | オブジェクトストレージ | Cloudflare R2 | 原本画像の保存。無料枠 10GB、エグレス無料 |
-| AIゲートウェイ | Cloudflare AI Gateway | キャッシュ・予算上限・リトライ・ログ集約。**ログはメタデータのみ収集し、ペイロード（元画像を含む本文）の収集は無効化する**（NF-2-42・AI-7） |
+| AIゲートウェイ | Cloudflare AI Gateway | キャッシュ・予算上限・リトライ・ログ集約。**ログはメタデータのみ収集し、ペイロード（元画像を含む本文）の収集は無効化する**（NF-2-42・AI-7a） |
 | OCR前処理（MVP 1.1） | Google Cloud Document AI Enterprise Document OCR | 日本語手書きを含むOCR文字・レイアウトをGeminiのPass①へ補助入力する。MVP 1.0では使用しない |
 | 認証 | Hono Basic Auth Middleware + 自前実装（WebCrypto PBKDF2 + D1セッション） | Basic認証をデモ環境への前段ゲートとし、アプリ内ログインで職員識別・ロール認可を行う |
 

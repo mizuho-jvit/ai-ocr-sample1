@@ -8,7 +8,7 @@ timestamp: 2026-08-20T00:00:00Z
 
 # プロジェクト概要とスコープ
 
-> 正典化元: 要件定義書 v1.10 §1・§2・§3・§12（原本は `knowledge/ref/doc/claude_code_要件定義_v1.10.md`）
+> 正典化元: 要件定義書 v1.11 §1・§2・§3・§12（原本は `knowledge/ref/doc/claude_code_要件定義_v1.11.md`）
 
 ## 目的
 

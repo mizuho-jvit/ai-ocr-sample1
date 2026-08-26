@@ -4,7 +4,7 @@
 
 AI-OCR 帳票読取・一次審査システム（営業デモ用）の知識ベース。**本 Wiki が正典である。** `input/` `output/` の資料は Wiki に整理され次第使い捨て、保持が必要な原本は `knowledge/ref/doc/` にコピーする（[OKF.md](../OKF.md) §1.1）。
 
-現在のステータス: **要件定義が確定（v1.10・未確定事項なし）、実装は未着手。MVP 1.0はGemini単体、MVP 1.1はDocument AI＋Gemini。**
+現在のステータス: **要件定義が確定（v1.11・未確定事項なし）、実装は未着手。MVP 1.0はGemini単体、MVP 1.1はDocument AI＋Gemini。**
 
 ## 要件・仕様 — `requirements/`
 
@@ -16,7 +16,7 @@ AI-OCR 帳票読取・一次審査システム（営業デモ用）の知識ベ�
 | [テナント分離](./requirements/tenant-isolation.md) | マルチテナント方針と4層防御。`TENANT_ID` 固定の根拠 |
 | [運用要件](./requirements/operations.md) | 単一デモ環境の共用、シード投入、開発・検証 |
 | [受け入れ基準](./requirements/acceptance.md) | 領域別チェックリスト |
-| [判断記録](./requirements/decisions.md) | 要求からの変更点12件、確定事項15件、**撤回した判断** |
+| [判断記録](./requirements/decisions.md) | 要求からの変更点12件、確定事項16件、**撤回した判断** |
 | [本番化ギャップ](./requirements/production-gap.md) | 本番構成を決める前に答えが必要な問い（Q-1〜Q-8）、**デモ限定の割り切り13件と本番での代替方針**、既に手当て済みの箇所、未記載の要件ギャップ |
 
 ## アーキテクチャ — `architecture/`
@@ -25,12 +25,15 @@ AI-OCR 帳票読取・一次審査システム（営業デモ用）の知識ベ�
 |---|---|
 | [システム構成](./architecture/cloudflare-stack.md) | Vite+React / Hono on Workers / D1+Drizzle / R2、無料枠の制約 |
 | [外部OCR・AI API](./architecture/ai-api.md) | MVP 1.0のGemini単体構成、MVP 1.1のDocument AI＋Gemini構成、コスト、認証、OCR Pipeline設計 |
+| [APIエンドポイント仕様](./architecture/api.md) | 全28エンドポイント、ロール認可、ステータスコード、共通のエラー規約 |
+| [共有型定義](./architecture/types.md) | SPA ↔ Worker の契約となる TypeScript 型、環境設定、テナントスコープ済みハンドル |
+| [データフロー](./architecture/dataflow.md) | リクエストの通過順、読取・業務チェック・名寄せの順序、状態遷移、リセット手順（Mermaid） |
 
 ## データモデル — `db/`
 
 | ページ | 内容 |
 |---|---|
-| [データモデル](./db/data-model.md) | 9テーブルの定義と複合制約 |
+| [データモデル](./db/data-model.md) | 10テーブルの定義・複合制約・監査列 |
 
 ## 画面 — `screens/`
 

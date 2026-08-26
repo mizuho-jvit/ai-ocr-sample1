@@ -4,7 +4,7 @@
 
 | ページ | 元の章 | 内容 |
 |---|---|---|
-| [data-model.md](./data-model.md) | 要件定義書 v1.5 §9 | Tenant / StaffUser / Member / Application / CheckRun / MatchCandidate / AppStatusHistory / StatusHistory / Session の9テーブル |
+| [data-model.md](./data-model.md) | 要件定義書 v1.11 §9・§9.2 | Tenant / StaffUser / Member / Application / CheckRun / UsageCounter / MatchCandidate / AppStatusHistory / StatusHistory / Session の10テーブル、列名の規約、監査列（`createdAt` / `updatedAt` / `createdById` / `updatedById`） |
 
 規模が小さいため当面1ファイルにまとめる（[OKF.md](../../OKF.md) §6）。テーブル数が増えてドメイン別の分割が必要になった時点で分ける。
 

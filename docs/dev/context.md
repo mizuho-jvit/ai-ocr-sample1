@@ -4,12 +4,12 @@
 > Confidence: 🔵 = user selected, 🟡 = inferred from selection, 🔴 = AI assumption
 
 > **要件の正典はこのファイルではない。** 機能要件・非機能要件・データモデル・画面・アーキテクチャの正典は
-> `knowledge/wiki/`（要件定義 v1.10 由来、未確定事項なし）である。本ファイルは実装エージェント向けの
+> `knowledge/wiki/`（要件定義 v1.11 由来、未確定事項なし）である。本ファイルは実装エージェント向けの
 > 技術コンテキストのみを持ち、要件を再掲しない。要件を参照するときは以下を読む:
 >
 > - [要件インデックス](../../knowledge/wiki/requirements/index.md) — 機能要件 F-1〜F-9 / 非機能要件 / 受け入れ基準 / 判断記録
 > - [システム構成](../../knowledge/wiki/architecture/cloudflare-stack.md) — 技術選定とその理由、無料枠の制約
-> - [データモデル](../../knowledge/wiki/db/data-model.md) — 9テーブルの定義と複合制約
+> - [データモデル](../../knowledge/wiki/db/data-model.md) — 10テーブルの定義・複合制約・監査列
 > - [画面一覧](../../knowledge/wiki/screens/screen-list.md) — 11画面
 
 ## Tech Stack
@@ -30,7 +30,7 @@
 | Project Layout | 一体型（単一 package.json） | 🔵 |
 
 Cloudflare 系のコンポーネントは推奨マトリクスに存在しないため、`knowledge/wiki/architecture/cloudflare-stack.md`
-（要件定義 v1.10 §4）の確定内容をそのまま採用した。選定理由と、Next.js + Prisma + ローカルFS 構成を却下した
+（要件定義 v1.11 §4）の確定内容をそのまま採用した。選定理由と、Next.js + Prisma + ローカルFS 構成を却下した
 経緯は [判断記録 #1〜#4](../../knowledge/wiki/requirements/decisions.md) にある。
 
 ## Test Framework
@@ -97,7 +97,7 @@ External → Internal（`src/worker/...`）→ Relative の順。named import �
 ### Logging
 
 - 開発時は `console.log`。Workers のログは `wrangler tail` で確認する 🟡
-- **AI Gateway のログはメタデータのみ**。ペイロード（元画像を含む本文）の収集は無効化する（NF-2-42・AI-7）🔵
+- **AI Gateway のログはメタデータのみ**。ペイロード（元画像を含む本文）の収集は無効化する（NF-2-42・AI-7a）🔵
 - Basic認証の資格情報をログに出力しない（F-1-14）🔵
 
 ## Key Entry Points
@@ -116,7 +116,7 @@ External → Internal（`src/worker/...`）→ Relative の順。named import �
 | 画像API | `src/worker/routes/images.ts` | R2 の原本画像配信 🟡 |
 | OCR Pipeline | `src/worker/services/ocr-pipeline.ts` | MVP1.0=Gemini単体 / MVP1.1=Document AI＋Gemini 🟡 |
 | 名寄せ | `src/worker/services/matching.ts` | 表記ゆれ・重複疑いの候補抽出（F-6）🟡 |
-| DBスキーマ | `src/worker/db/schema.ts` | Drizzle による9テーブル定義 🟡 |
+| DBスキーマ | `src/worker/db/schema.ts` | Drizzle による10テーブル定義 🟡 |
 | SPA エントリ | `src/react-app/main.tsx` | React ルート 🔴 |
 | Wrangler 設定 | `wrangler.toml` | `assets.binding = "ASSETS"`, `assets.run_worker_first = true` 🔵 |
 
@@ -174,5 +174,5 @@ GitHub Actions を使う 🔵。`.github/workflows/ci.yml` でテスト・Lint�
 - E2E（Playwright）を入れるか、入れる場合の実行環境
 - `docs/dev/` と `knowledge/wiki/` の物理配置（現状はデフォルトの `docs/dev/`。wiki 配下へ寄せる案は保留中）
 
-要件側の未確定事項は「なし」（v1.10 時点）。本番化の論点は
+要件側の未確定事項は「なし」（v1.11 時点）。本番化の論点は
 [本番化ギャップ](../../knowledge/wiki/requirements/production-gap.md) にまとまっており、**MVP の未確定事項ではない**。

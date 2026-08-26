@@ -8,7 +8,7 @@ timestamp: 2026-08-20T00:00:00Z
 
 # 受け入れ基準
 
-> 正典化元: 要件定義書 v1.10 §14（原本は `knowledge/ref/doc/claude_code_要件定義_v1.10.md`）
+> 正典化元: 要件定義書 v1.11 §14（原本は `knowledge/ref/doc/claude_code_要件定義_v1.11.md`）
 > 各項目の根拠となる要件は [機能要件](./functional.md)・[非機能要件](./non-functional.md)・[テナント分離](./tenant-isolation.md)。
 
 ## 認証・認可
@@ -136,6 +136,23 @@ timestamp: 2026-08-20T00:00:00Z
 - [ ] **デモ動線（読取 → 業務チェック → 名寄せで紐付け → 承認）を一巡してもシード会員の行が変化しない**（[復元しない根拠](./functional.md#シード会員の値を復元しない根拠)の前提確認）
 - [ ] リセット直後にサンプル申請書を処理すると、名寄せでシード会員「仙臺 一郎」が再び候補に出る（初期状態への復帰確認）
 - [ ] **上記がリセット2回目・3回目でも同様に成立する**（状態の累積的な乖離がないこと）
+
+## データモデル（[列名の規約・監査列](../db/data-model.md#列名の規約)）
+
+- [ ] 全テーブルに `processedById` / `lastEditedById` / `executedById` / `executedAt` / `changedById` / `registeredAt` が存在しない（列名統一の完了確認）
+- [ ] スタッフアカウントを編集すると `StaffUser.updatedAt` と `updatedById` が更新され、**`role` を `staff → admin` に変更した操作の実行者が特定できる**
+- [ ] スタッフアカウントを `isActive = false` にした操作の実行者と日時が特定できる
+- [ ] F-9 のリセットを実行しても `StaffUser` の監査列が失われない（F-9-5 で削除対象外のため）
+- [ ] 会員の住所・電話・氏名を編集すると `Member.updatedAt` と `updatedById` が更新される（`StatusHistory` には残らない変更であること）
+- [ ] CSVインポート（F-8-5）で登録された会員の `createdById` にインポート実行者が記録される
+- [ ] 会員一覧・会員詳細に表示される「登録日」が `Member.createdAt` の値である（F-5-2 の保持項目が失われていない）
+- [ ] 業務チェックを再実施すると `MatchCandidate.updatedAt` が更新され、**先に行った採否判断の `decidedById` / `decidedAt` は変化しない**
+- [ ] `CheckRun` / `AppStatusHistory` / `StatusHistory` に `updatedAt` / `updatedById` が存在しない（追記専用であること）
+- [ ] 監査列がAPI応答に含まれない（[api.md](../architecture/api.md) と [types.md](../architecture/types.md) に定めのない列を返していない）
+- [ ] シード投入で作成された会員・職員の `createdById` が `NULL` である（アプリケーション外の操作を表す）
+- [ ] 画面から作成したレコードの `createdById` が `NULL` にならない
+- [ ] レコード作成直後の `updatedAt` が `NULL` ではなく `createdAt` と同値である
+- [ ] `createdById` / `updatedById` が指す `StaffUser` が同一テナントに限られる（テナントBの職員IDが混入しない）
 
 ## プロダクト要件
 

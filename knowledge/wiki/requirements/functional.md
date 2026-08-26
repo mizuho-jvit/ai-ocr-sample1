@@ -8,7 +8,7 @@ timestamp: 2026-08-20T00:00:00Z
 
 # 機能要件 F-1〜F-9
 
-> 正典化元: 要件定義書 v1.10 §5（原本は `knowledge/ref/doc/claude_code_要件定義_v1.10.md`）
+> 正典化元: 要件定義書 v1.11 §5（原本は `knowledge/ref/doc/claude_code_要件定義_v1.11.md`）
 > 前提となるスコープ・ロールは [プロジェクト概要とスコープ](./overview.md)。
 
 ## F-1 職員認証
@@ -197,7 +197,7 @@ timestamp: 2026-08-20T00:00:00Z
 | `name` / `nameKana` / `birthDate` / `postalCode` / `address` / `phone` / `email` | F-5-1（会員の編集） | **なし**（提示しない） |
 | `nameNormalized` / `kanaNormalized` | 上記編集に連動して再計算（F-6-2） | **なし** |
 
-`id` / `tenantId` / `memberNumber` / `registeredAt` / `isSeed` はいずれの操作でも変化しない。
+`id` / `tenantId` / `memberNumber` / `createdAt`（画面の「登録日」）/ `isSeed` はいずれの操作でも変化しない。
 
 **自動的に変化する経路は存在しない。** F-4-3（承認時に会員を `pending` → `active` へ昇格）は対象が `pending` の会員に限られるが、**シード会員は5件とも `active` で投入される**ため（F-5-10・プロトタイプ `SEED_MEMBERS`）発火しない。名寄せによる紐付け（F-6-8）は `Application.memberId` を設定する操作であり、`Member` 自体を変更しない。
 
