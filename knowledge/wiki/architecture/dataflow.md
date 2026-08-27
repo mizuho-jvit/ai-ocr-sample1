@@ -3,7 +3,7 @@ type: architecture
 title: データフロー
 description: リクエストの通過順、帳票読取・AI業務チェック・名寄せの処理順序、申請と会員の状態遷移、デモデータのリセット手順をMermaidで表した図
 tags: [ai-ocr, dataflow, sequence, state-machine, mermaid]
-timestamp: 2026-08-25T00:00:00Z
+timestamp: 2026-08-27T00:00:00Z
 ---
 
 # データフロー
@@ -80,7 +80,7 @@ sequenceDiagram
         Note over P: MVP 1.0 と 1.1 の差は<br/>この境界の内側に閉じる
         P-->>W: ExtractedApplication
         W->>R2: put 原本画像<br/>キーは tenantId/applicationId.ext
-        W->>D1: INSERT Application<br/>appStatus は 受付
+        W->>D1: INSERT Application<br/>appStatus は received（受付）
         W-->>SPA: 200 OcrExtractResponse
         SPA->>U: 読取確認画面<br/>確信度85%未満を黄色でハイライト
     end
@@ -93,7 +93,7 @@ sequenceDiagram
 | 上限到達時にAIを呼ばない | NF-2-16（fail closed） |
 | `OcrPipeline` 境界の内側で 1.0 / 1.1 を切り替える | F-2-13・NF-4-2・NF-4-5 |
 | 原本画像のキーに `tenantId` プレフィックス | NF-5-21 |
-| 読取完了と同時に申請を保存（`受付`） | F-2-8 |
+| 読取完了と同時に申請を保存（`received` / 受付） | F-2-8 |
 | 確信度85%未満をハイライト | NF-4-3（閾値は定数）・screen-list.md |
 
 **失敗時の扱い** — 読取完了前に失敗した場合、**未完成の申請レコードを作成しない**（ai-api.md）。カウンタは加算済みのまま戻さない（fail closed 側に倒す判断・NF-2-39 の限界）。
@@ -119,13 +119,13 @@ sequenceDiagram
 
     U->>W: POST /api/checks/run
     W->>D1: 申請を取得
-    alt appStatus が 承認
+    alt appStatus が approved（承認）
         W-->>U: 409 INVALID_TRANSITION
     else CheckRun 件数が上限
         W-->>U: 409 CHECK_RUN_LIMIT
     else 実行可能
-        opt appStatus が 受付
-            W->>D1: 審査中 へ遷移し AppStatusHistory に記録
+        opt appStatus が received（受付）
+            W->>D1: under_review（審査中）へ遷移し AppStatusHistory に記録
         end
         W->>N: 抽出項目を渡す
         N->>N: 正規化<br/>旧字体・NFKC・カナ・和暦・電話
@@ -142,9 +142,9 @@ sequenceDiagram
 
 | 段階 | 根拠 |
 |---|---|
-| `承認` 済みでは実施不可 | F-4-6 |
+| `approved`（承認）済みでは実施不可 | F-4-6 |
 | 再実施回数の上限 | NF-2-21（MVP は 5回） |
-| `受付` → `審査中` の自動遷移 | F-4-7 |
+| `received`（受付）→ `under_review`（審査中）の自動遷移 | F-4-7 |
 | 第1段は決定的・AI不使用 | F-6-1・F-6-3・F-6-12 |
 | 照合は `tenantId` を先頭列とする複合インデックス | data-model.md・NF-5-13 |
 | 上位5件のみ AI へ | F-6-4・F-6-5・F-6-6 |

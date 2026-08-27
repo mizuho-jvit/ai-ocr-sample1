@@ -3,7 +3,7 @@ type: architecture
 title: APIエンドポイント仕様
 description: /api/auth /api/usage /api/ocr /api/checks /api/applications /api/members /api/staff /api/images /api/demo の全エンドポイント、認可、ステータスコード、共通のエラー規約
 tags: [ai-ocr, api, hono, rest, authorization, tenant-isolation]
-timestamp: 2026-08-25T00:00:00Z
+timestamp: 2026-08-27T00:00:00Z
 ---
 
 # APIエンドポイント仕様
@@ -155,10 +155,10 @@ SPA の初期化時に必ず呼び、`401` ならログイン画面へリダイ�
 ← 409 { "error": { "code": "CHECK_RUN_LIMIT", ... } }      // 再実施回数の上限
 ```
 
-- 実行可能なのは `受付` / `審査中` / `差戻し` の申請のみ。**`承認` 済みでは実施不可**（F-4-6）
+- 実行可能なのは `received`（受付）/ `under_review`（審査中）/ `returned`（差戻し）の申請のみ。**`approved`（承認）済みでは実施不可**（F-4-6）
 - 1申請あたりの `CheckRun` 件数が `MAX_CHECK_RUNS_PER_APPLICATION`（MVP 5）に達していれば `409`（NF-2-21）
 - Gemini 呼び出し回数のカウンタも加算対象（Pass①・Pass②の合算・NF-2-17・NF-2-34）。上限到達は `429`
-- **`受付` の申請は自動的に `審査中` へ遷移する**（F-4-7）。遷移は `AppStatusHistory` に記録する
+- **`received`（受付）の申請は自動的に `under_review`（審査中）へ遷移する**（F-4-7）。遷移は `AppStatusHistory` に記録する
 - 結果は新たな `CheckRun` として記録し（F-4-8）、`Application.latestCheckRunId` を更新する
 - 名寄せは第1段（AI呼び出しなし・F-6-12）→ 第2段（候補のみAIへ・F-6-5）の順。`rejected` 済みの組み合わせは再提示しない（F-6-10）
 - 既存の `MatchCandidate` は `UNIQUE(applicationId, memberId)` により重複登録されず、`ruleScore` / `aiLikelihood` を更新する
@@ -179,10 +179,10 @@ SPA の初期化時に必ず呼び、`401` ならログイン画面へリダイ�
 
 | From | To |
 |---|---|
-| `受付` | `審査中` |
-| `審査中` | `承認` / `差戻し` |
-| `差戻し` | `審査中` |
-| `承認` | **なし（確定状態）** |
+| `received`（受付） | `under_review`（審査中） |
+| `under_review`（審査中） | `approved`（承認） / `returned`（差戻し） |
+| `returned`（差戻し） | `under_review`（審査中） |
+| `approved`（承認） | **なし（確定状態）** |
 
 - すべての変更を `AppStatusHistory` に記録する（変更者・日時・前後の状態・備考・F-4-4）
 - **`承認` へ変更した際、紐付く会員が `pending` であれば `active` へ昇格させ、`StatusHistory` に記録する**（F-4-3）。昇格した場合のみ応答の `promotedMember` に会員を返す

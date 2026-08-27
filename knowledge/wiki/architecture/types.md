@@ -3,7 +3,7 @@ type: architecture
 title: 共有型定義（SPA ↔ Worker の契約）
 description: ロール・状態・OCR抽出結果・業務チェック・名寄せ・APIのDTO・環境設定・テナントスコープ済みハンドルのTypeScript型定義
 tags: [ai-ocr, typescript, types, contract, api, tenant-isolation]
-timestamp: 2026-08-25T00:00:00Z
+timestamp: 2026-08-27T00:00:00Z
 ---
 
 # 共有型定義（SPA ↔ Worker の契約）
@@ -16,23 +16,23 @@ timestamp: 2026-08-25T00:00:00Z
 
 ## 1. 列挙型
 
-DB のカラムは TEXT であり、値の集合はアプリケーション側の型で表現する（[データモデル](../db/data-model.md)）。
+DB のカラムは TEXT であり、永続値は表示文言から独立した英字コードを使う。値の集合はアプリケーション側の型と DB の `CHECK` 制約の両方で表現する（[データモデル](../db/data-model.md)）。
 
 ```ts
 /** 職員のロール（overview.md 権限マトリクス） */
 export type Role = 'admin' | 'staff';
 
 /** 申請の決裁状態。AI判定 Triage とは別軸で保持する（F-4-1） */
-export type AppStatus = '受付' | '審査中' | '承認' | '差戻し';
+export type AppStatus = 'received' | 'under_review' | 'approved' | 'returned';
 
 /** 会員の状態（F-5-3） */
 export type MemberStatus = 'pending' | 'active' | 'suspended' | 'inactive';
 
 /** AIのトリアージ判定。決裁状態を自動変更しない参考情報（F-3-4・F-4-1） */
-export type Triage = '承認候補' | '要審査' | '差戻し候補';
+export type Triage = 'approval_candidate' | 'needs_review' | 'return_candidate';
 
 /** 名寄せ第2段のAI判定（F-6-5） */
-export type Likelihood = '高' | '中' | '低';
+export type Likelihood = 'high' | 'medium' | 'low';
 
 /** 名寄せ候補に対する職員の判断結果（F-6-8・F-6-9） */
 export type MatchStatus = 'pending' | 'merged' | 'rejected' | 'hold';
@@ -44,7 +44,13 @@ export type Severity = 'error' | 'warning';
 export type OcrPipelineMode = 'gemini' | 'document-ai-gemini';
 ```
 
-> `AppStatus` / `Triage` / `Likelihood` は**日本語の値をそのまま永続化する**。[データモデル](../db/data-model.md)の定義がそうなっており、CSV出力（F-8-3）でも同じ文字列を列値として使うため、英語コードとの相互変換層を設けない。
+`AppStatus` / `Triage` / `Likelihood` は**英字コードを永続化する**。画面と CSV は次の表示ラベルへ変換する。表示文言の変更をデータ移行にしないためであり、`MemberStatus` / `MatchStatus` も同じく英字コードを使う。
+
+| 型 | 永続値 | 表示ラベル |
+|---|---|---|
+| `AppStatus` | `received` / `under_review` / `approved` / `returned` | 受付 / 審査中 / 承認 / 差戻し |
+| `Triage` | `approval_candidate` / `needs_review` / `return_candidate` | 承認候補 / 要審査 / 差戻し候補 |
+| `Likelihood` | `high` / `medium` / `low` | 高 / 中 / 低 |
 
 ## 2. 識別子
 

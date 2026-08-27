@@ -2,6 +2,14 @@
 
 <!-- 予約ファイル。フロントマターは付けない。日付見出し（ISO 8601）ごとに新しいものを上に追記する。 -->
 
+## 2026-08-27
+
+### 状態・AI判定の永続値を英字文字列コードへ統一した
+
+- `AppStatus`、`Triage`、`Likelihood` は日本語表示をそのままDB/APIへ保存せず、`received` / `under_review`、`approval_candidate`、`high` などの英字コードを永続化する。
+- 画面とCSVはコードを日本語ラベルへ変換する。表示文言の変更を既存データ・状態履歴の書換えにしないためである。
+- `MemberStatus` と `MatchStatus` は既に同じ方針の英字コードであり、これに揃えた。すべての状態列と状態履歴列はSQLite/D1の `CHECK` 制約で値集合を制限し、遷移規則はサービス層で検証する。
+
 ## 2026-08-26
 
 ### 監査列（`createdAt` / `updatedAt` / `createdById` / `updatedById`）の要否を運用面から再検討し、追加した

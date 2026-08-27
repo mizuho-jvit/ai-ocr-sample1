@@ -15,7 +15,6 @@ database_name = "ai-ocr-sample1"
 # D1作成後に実際のIDへ置き換える。ゼロUUIDはローカル開発専用の仮値。
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "drizzle"
-migrations_pattern = "drizzle/*/migration.sql"
 
 [[r2_buckets]]
 binding = "IMAGES"

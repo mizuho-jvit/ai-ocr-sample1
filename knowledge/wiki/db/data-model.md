@@ -3,7 +3,7 @@ type: db-domain
 title: データモデル（D1 テーブル定義）
 description: Tenant / StaffUser / Member / Application / CheckRun / UsageCounter / MatchCandidate / AppStatusHistory / StatusHistory / Session の10テーブル、複合制約、監査列（createdAt / updatedAt / createdById / updatedById）の方針
 tags: [ai-ocr, database, d1, drizzle, schema, multi-tenancy, audit]
-timestamp: 2026-08-26T00:00:00Z
+timestamp: 2026-08-27T00:00:00Z
 ---
 
 # データモデル（D1 テーブル定義）
@@ -15,6 +15,20 @@ timestamp: 2026-08-26T00:00:00Z
 ログインする職員（`StaffUser`）と、ログインしない会員（`Member`）は**別テーブルに分離する**（会員に認証情報を持たせないため）。
 
 **全テーブルが `tenantId` を NOT NULL で持ち、全クエリにテナント条件を付与する。** 強制手段は [テナント分離](../requirements/tenant-isolation.md)。
+
+## 状態値の永続化
+
+状態・判定の値は、画面文言ではなく**安定した英字コードを TEXT として永続化する**。画面と CSV は [共有型定義](../architecture/types.md#1-列挙型) の表示ラベルへ変換する。これにより、利用者向けの日本語ラベルを変更しても既存データ・履歴を更新する必要がない。
+
+| 区分 | 永続値 | 表示ラベル |
+|---|---|---|
+| 申請状態 `AppStatus` | `received` / `under_review` / `approved` / `returned` | 受付 / 審査中 / 承認 / 差戻し |
+| 会員状態 `MemberStatus` | `pending` / `active` / `suspended` / `inactive` | 申請中 / 利用資格あり / 停止中 / 退会 |
+| AIトリアージ `Triage` | `approval_candidate` / `needs_review` / `return_candidate` | 承認候補 / 要審査 / 差戻し候補 |
+| AI可能性 `Likelihood` | `high` / `medium` / `low` | 高 / 中 / 低 |
+| 名寄せ判断 `MatchStatus` | `pending` / `merged` / `rejected` / `hold` | 未判断 / 同一人物 / 別人 / 保留 |
+
+各列は Drizzle の型だけに任せず、対応する値集合の `CHECK` 制約を持つ。履歴テーブルの `fromStatus` / `toStatus` も、対象テーブルと同じ値集合に制限する。状態遷移の可否はサービス層で検証し、状態更新と履歴の追加を同一トランザクションで実行する。
 
 ## 列名の規約
 
@@ -245,7 +259,7 @@ DTO 側（[types.md](../architecture/types.md)）の `processedBy` / `lastEdited
 | docType | TEXT | 帳票種別 |
 | fieldsJson | TEXT | `[{label, value, confidence, edited}]` |
 | imageKey | TEXT | R2オブジェクトキー `{tenantId}/{applicationId}.{ext}`（NF-5-21）・NULL可 |
-| appStatus | TEXT | `受付` \| `審査中` \| `承認` \| `差戻し`（既定 `受付`） |
+| appStatus | TEXT | `received` \| `under_review` \| `approved` \| `returned`（既定 `received`）。表示ラベルは[状態値の永続化](#状態値の永続化) |
 | latestCheckRunId | TEXT | 最新の業務チェック結果への参照・NULL可 |
 | editedCount | INTEGER | **既定 0** |
 | processingSec | REAL | |
@@ -266,11 +280,11 @@ DTO 側（[types.md](../architecture/types.md)）の `processedBy` / `lastEdited
 | id | TEXT | PK |
 | tenantId | TEXT | → Tenant（NOT NULL） |
 | applicationId | TEXT | → Application |
-| triage | TEXT | `承認候補` \| `要審査` \| `差戻し候補` |
+| triage | TEXT | `approval_candidate` \| `needs_review` \| `return_candidate`。表示ラベルは[状態値の永続化](#状態値の永続化) |
 | triageReason | TEXT | |
 | consistencyJson | TEXT | 整合性検証結果 |
 | deficienciesJson | TEXT | 不備検出結果 |
-| letterDraft | TEXT | 差戻し文面の下書き |
+| letterDraft | TEXT | 差戻し文面の下書き・NULL可（不備または矛盾がある場合のみ生成） |
 | createdAt | DATETIME | 実行時刻（旧 `executedAt`）。追記専用のため両者は常に一致する |
 | createdById | TEXT | → StaffUser（**NOT NULL**）。実行した職員（旧 `executedById`） |
 
@@ -287,7 +301,7 @@ DTO 側（[types.md](../architecture/types.md)）の `processedBy` / `lastEdited
 | applicationId | TEXT | → Application |
 | memberId | TEXT | → Member |
 | ruleScore | REAL | 第1段スコア |
-| aiLikelihood | TEXT | `高` \| `中` \| `低`・NULL可 |
+| aiLikelihood | TEXT | `high` \| `medium` \| `low`・NULL可。表示ラベルは[状態値の永続化](#状態値の永続化) |
 | aiReason | TEXT | NULL可 |
 | status | TEXT | `pending` \| `merged` \| `rejected` \| `hold`（既定 `pending`） |
 | decidedById | TEXT | → StaffUser・NULL可 |
@@ -306,8 +320,8 @@ DTO 側（[types.md](../architecture/types.md)）の `processedBy` / `lastEdited
 | id | TEXT | PK |
 | tenantId | TEXT | → Tenant（NOT NULL） |
 | applicationId | TEXT | → Application |
-| fromStatus | TEXT | |
-| toStatus | TEXT | |
+| fromStatus | TEXT | NULL可。初期状態の記録では NULL |
+| toStatus | TEXT | NOT NULL |
 | note | TEXT | NULL可 |
 | createdAt | DATETIME | |
 | createdById | TEXT | **→ StaffUser（リレーションとして定義・NOT NULL）**。変更者（旧 `changedById`） |
@@ -321,8 +335,8 @@ DTO 側（[types.md](../architecture/types.md)）の `processedBy` / `lastEdited
 | id | TEXT | PK |
 | tenantId | TEXT | → Tenant（NOT NULL） |
 | memberId | TEXT | → Member |
-| fromStatus | TEXT | |
-| toStatus | TEXT | |
+| fromStatus | TEXT | NULL可。初期状態の記録では NULL |
+| toStatus | TEXT | NOT NULL |
 | reason | TEXT | NULL可 |
 | createdAt | DATETIME | |
 | createdById | TEXT | → StaffUser（**NOT NULL**）。変更者（旧 `changedById`） |
