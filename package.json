@@ -1,0 +1,40 @@
+{
+  "name": "ai-ocr-sample1",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.24.0",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "dev": "vite",
+    "dev:remote": "corepack pnpm build && wrangler dev --remote",
+    "deploy": "wrangler deploy",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cf-typegen": "wrangler types",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "wrangler d1 migrations apply DB --local"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.7",
+    "hono": "4.11.1",
+    "react": "19.2.1",
+    "react-dom": "19.2.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.0",
+    "@cloudflare/vite-plugin": "1.52.1",
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.1",
+    "drizzle-kit": "^0.31.0",
+    "typescript": "5.9.3",
+    "vite": "^7.0.0",
+    "vitest": "^4.1.0",
+    "wrangler": "4.123.0"
+  }
+}

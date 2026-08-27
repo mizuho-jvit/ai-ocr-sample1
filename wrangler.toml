@@ -1,0 +1,22 @@
+name = "ai-ocr-sample1"
+main = "./src/worker/index.ts"
+# ローカルのworkerdが対応する最新日付。依存更新時に見直す。
+compatibility_date = "2026-08-22"
+
+[assets]
+binding = "ASSETS"
+directory = "./dist/client"
+run_worker_first = true
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ai-ocr-sample1"
+# D1作成後に実際のIDへ置き換える。ゼロUUIDはローカル開発専用の仮値。
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "drizzle"
+migrations_pattern = "drizzle/*/migration.sql"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "ai-ocr-sample1-images"

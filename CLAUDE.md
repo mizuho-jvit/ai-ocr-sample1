@@ -58,7 +58,17 @@ Wiki の構造・編集規約は `knowledge/SCHEMA.md`(憲法)と `knowledge/OKF
 
 ## ビルド・テスト
 
-package.json はまだ存在しない。**予定しているコマンドは [`docs/dev/context.md`](docs/dev/context.md) の Build & Run に記載**(すべて 🔴 = 未確定)。実際に作成したら lockfile をコミットし、確定したコマンド(単一テストの実行方法を含む)をこのファイルと `README.md` に追記すること。
+パッケージマネージャーは pnpm（Corepack 経由）を使用する。代表的なコマンドは次のとおり。
+
+```sh
+corepack pnpm install
+corepack pnpm lint
+corepack pnpm test
+corepack pnpm test -- src/worker/index.test.ts
+corepack pnpm build
+```
+
+開発サーバーは `corepack pnpm dev`、CPU時間を実測するリモート開発は `corepack pnpm dev:remote` を使う。全コマンドは [`docs/dev/context.md`](docs/dev/context.md) の Build & Run を正とする。
 
 現時点でのコミット前チェック:
 

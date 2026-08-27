@@ -68,7 +68,7 @@ knowledge/wiki/      # 要件の正典（実装対象ではない）
 docs/dev/            # 実装計画・コンテキスト（本ファイル）
 ```
 
-一体型のため、SPA から Worker 側の型を相対パス（`../../worker/types`）で直接 import する。
+一体型のため、SPA から Worker 側の型を相対パス（`../worker/types`）で直接 import する。
 ただし **SPA から Worker の service 実装を import してはならない**。SPA は `fetch('/api/...')` のみで通信する。
 
 ## Coding Conventions
@@ -124,19 +124,21 @@ External → Internal（`src/worker/...`）→ Relative の順。named import �
 
 ## Build & Run
 
-未実装のため、すべて 🔴（package.json 作成時に確定させる）。
+Phase 5 で実装・検証済み（🔵）。`pnpm` は Corepack 経由で使用する。
 
 | Command | Description |
 |---------|------------|
-| `pnpm install` | 依存インストール |
-| `pnpm dev` | ローカル開発（Vite + `wrangler dev`） |
-| `pnpm dev:remote` | `wrangler dev --remote`。**CPU時間の実測はこちらで行う**（OP-6） |
-| `pnpm build` | SPA ビルド → Worker バンドル |
-| `pnpm test` | Vitest 実行 |
-| `pnpm lint` | Biome チェック |
-| `pnpm format` | Biome フォーマット |
-| `pnpm deploy` | `wrangler deploy` → Worker 1つ |
-| `pnpm db:migrate` | Drizzle マイグレーションを D1 に適用 |
+| `corepack pnpm install` | 依存インストール 🔵 |
+| `corepack pnpm dev` | Cloudflare Vite plugin によるローカル開発 🔵 |
+| `corepack pnpm dev:remote` | ビルド後に `wrangler dev --remote`。**CPU時間の実測はこちらで行う**（OP-6） 🔵 |
+| `corepack pnpm build` | SPA ビルドとWorkerバンドル 🔵 |
+| `corepack pnpm test` | `@cloudflare/vitest-pool-workers` による workerd 上のVitest実行 🔵 |
+| `corepack pnpm test -- src/worker/index.test.ts` | 単一テストファイルの実行 🔵 |
+| `corepack pnpm lint` | Biome チェック 🔵 |
+| `corepack pnpm format` | Biome フォーマット 🔵 |
+| `corepack pnpm deploy` | `wrangler deploy` によるWorker 1つのデプロイ 🔵 |
+| `corepack pnpm db:generate` | Drizzleスキーマからマイグレーションを生成（スキーマ実装後） 🔵 |
+| `corepack pnpm db:migrate` | ローカルD1へDrizzleマイグレーションを適用 🔵 |
 
 ## Additional Notes
 
