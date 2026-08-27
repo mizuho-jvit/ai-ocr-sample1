@@ -147,6 +147,9 @@ NF-2-15 は Cloudflare 側の最終的な歯止めであり、到達した時点
 | `OCR_PIPELINE_MODE` | 1.0: `gemini`／1.1: `document-ai-gemini` | **起動失敗** | NF-4-5 |
 | `GEMINI_MODEL` | `gemini-3.1-flash-lite` | **起動失敗** | NF-4-6 |
 | `GEMINI_API_KEY` | Gemini APIキー（Workers Secret） | **起動失敗** | NF-2-13 |
+| `R2_ACCOUNT_ID` | R2 S3 APIのCloudflare Account ID | **起動失敗** | NF-2-14・判断記録 #18 |
+| `R2_S3_ACCESS_KEY_ID` | 署名URL発行専用のR2 S3 API Access Key ID（Workers Secret） | **起動失敗** | NF-2-14・判断記録 #18 |
+| `R2_S3_SECRET_ACCESS_KEY` | 署名URL発行専用のR2 S3 API Secret Access Key（Workers Secret） | **起動失敗** | NF-2-14・判断記録 #18 |
 | `GOOGLE_CLOUD_PROJECT_ID` | 1.1のGoogle CloudプロジェクトID | 1.1のみ**起動失敗** | NF-4-7 |
 | `DOCUMENT_AI_LOCATION` | 1.1のProcessorロケーション | 1.1のみ**起動失敗** | NF-4-7 |
 | `DOCUMENT_AI_PROCESSOR_ID` | 1.1のEnterprise OCR Processor ID | 1.1のみ**起動失敗** | NF-4-7 |

@@ -261,7 +261,9 @@ SPA の初期化時に必ず呼び、`401` ならログイン画面へリダイ�
 - **発行前に、対象オブジェクトキーの `{tenantId}/` プレフィックスが現在のテナントと一致することを検証する**（NF-5-19）
 - 保持期間は30日。経過後は削除する（NF-3-1）
 
-> **未解決の実装論点**: R2 の署名付きURLは S3 互換 API の資格情報（Access Key ID / Secret Access Key）を必要とするが、[環境変数の一覧](../requirements/non-functional.md#環境変数の一覧統合)にこれに相当する項目がない。実装前に、資格情報を Workers Secret として追加するか、Worker がバイト列を中継する方式（この場合 NF-2-14 の「署名付きURL」の文言と整合しない）かを決める必要がある。**要件側の判断が要るため、本ページでは決めない。**
+Workerはアプリ内セッションとテナントprefixを検証した後、R2 S3互換APIの**GET署名URLを都度発行する**。URLの有効期限は15分であり、DB・localStorage・ログへ保存しない。申請一覧・詳細の再表示時、または失効後の画像再読込時は、本エンドポイントを再度呼び出して新しいURLを取得する。
+
+発行に必要な `R2_S3_ACCESS_KEY_ID` / `R2_S3_SECRET_ACCESS_KEY` はWorkers Secret、`R2_ACCOUNT_ID` は通常の環境変数として設定する。発行専用のR2 APIトークンは必要最小限の権限に限定する。判断の根拠は[判断記録 #18](../requirements/decisions.md#確定事項)と[Cloudflare R2の署名URL仕様](https://developers.cloudflare.com/r2/api/s3/presigned-urls/)を参照する。
 
 ### `DELETE /api/applications/:id/image`
 

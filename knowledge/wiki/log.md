@@ -4,6 +4,13 @@
 
 ## 2026-08-27
 
+### R2原本画像は都度発行する15分の署名付きURLで配信する方針を確定
+
+- `GET /api/images/:applicationId` は、アプリ内セッションとR2キーの `{tenantId}/` prefixを確認した後、R2 S3互換APIのGET署名URLを**都度**発行する。
+- URLは15分で失効するBearer tokenとして扱い、D1・localStorage・ログへ保存しない。申請一覧・詳細を開き直す場合や、開いたまま失効した画像を再読込する場合は、同じAPIから新しいURLを取得する。
+- 発行用の `R2_S3_ACCESS_KEY_ID` / `R2_S3_SECRET_ACCESS_KEY` はWorkers Secret、`R2_ACCOUNT_ID` は通常の環境変数とした。発行専用トークンの権限は最小限に限定する。
+- [API仕様](./architecture/api.md#原本画像)、[共有型](./architecture/types.md#8-環境設定)、[環境変数一覧](./requirements/non-functional.md#環境変数の一覧統合)、[判断記録 #18](./requirements/decisions.md#確定事項)へ反映した。
+
 ### 状態・AI判定の永続値を英字文字列コードへ統一した
 
 - `AppStatus`、`Triage`、`Likelihood` は日本語表示をそのままDB/APIへ保存せず、`received` / `under_review`、`approval_candidate`、`high` などの英字コードを永続化する。

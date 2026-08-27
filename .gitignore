@@ -164,5 +164,8 @@ vite.config.ts.timestamp-*
 /.ripgreprc
 /.gitmodules
 /.mcp.json
+/.agents/
+/.rulesync/
+/rulesync.jsonc
 /.idea
 /.vscode

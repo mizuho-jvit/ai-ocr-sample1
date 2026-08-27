@@ -532,11 +532,14 @@ export interface Env {
   ALLOW_DATA_RESET?: string;
   OCR_PIPELINE_MODE: string;
   GEMINI_MODEL: string;
+  R2_ACCOUNT_ID: string;
 
   // Workers Secret
   BASIC_AUTH_USERNAME: string;
   BASIC_AUTH_PASSWORD: string;
   GEMINI_API_KEY: string;
+  R2_S3_ACCESS_KEY_ID: string;
+  R2_S3_SECRET_ACCESS_KEY: string;
 
   // MVP 1.1 のみ必須（NF-4-7）
   GOOGLE_CLOUD_PROJECT_ID?: string;
