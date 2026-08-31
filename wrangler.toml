@@ -3,6 +3,13 @@ main = "./src/worker/index.ts"
 # ローカルのworkerdが対応する最新日付。依存更新時に見直す。
 compatibility_date = "2026-08-22"
 
+[observability]
+enabled = true
+head_sampling_rate = 1.0
+
+[observability.logs]
+invocation_logs = true
+
 [assets]
 binding = "ASSETS"
 directory = "./dist/client"

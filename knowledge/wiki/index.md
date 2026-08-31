@@ -16,7 +16,7 @@ AI-OCR 帳票読取・一次審査システム（営業デモ用）の知識ベ�
 | [テナント分離](./requirements/tenant-isolation.md) | マルチテナント方針と4層防御。`TENANT_ID` 固定の根拠 |
 | [運用要件](./requirements/operations.md) | 単一デモ環境の共用、シード投入、開発・検証 |
 | [受け入れ基準](./requirements/acceptance.md) | 領域別チェックリスト |
-| [判断記録](./requirements/decisions.md) | 要求からの変更点12件、確定事項16件、**撤回した判断** |
+| [判断記録](./requirements/decisions.md) | 要求からの変更点12件、確定事項19件、**撤回した判断** |
 | [本番化ギャップ](./requirements/production-gap.md) | 本番構成を決める前に答えが必要な問い（Q-1〜Q-8）、**デモ限定の割り切り13件と本番での代替方針**、既に手当て済みの箇所、未記載の要件ギャップ |
 
 ## アーキテクチャ — `architecture/`
@@ -28,6 +28,7 @@ AI-OCR 帳票読取・一次審査システム（営業デモ用）の知識ベ�
 | [APIエンドポイント仕様](./architecture/api.md) | 全28エンドポイント、ロール認可、ステータスコード、共通のエラー規約 |
 | [共有型定義](./architecture/types.md) | SPA ↔ Worker の契約となる TypeScript 型、環境設定、テナントスコープ済みハンドル |
 | [データフロー](./architecture/dataflow.md) | リクエストの通過順、読取・業務チェック・名寄せの順序、状態遷移、リセット手順（Mermaid） |
+| [ログ・例外処理・可観測性](./architecture/observability.md) | Workers無料枠内の構造化ログ、try/catch/finally、処理段階追跡、機微情報保護 |
 
 ## データモデル — `db/`
 

@@ -2,6 +2,28 @@
 
 <!-- 予約ファイル。フロントマターは付けない。日付見出し（ISO 8601）ごとに新しいものを上に追記する。 -->
 
+## 2026-08-31
+
+### ID にブランド型（nominal typing）を導入する判断へ変更した
+
+- Task 002（`src/worker/db/{client,repositories,seed}.ts`）のコードレビューで、`repositories.ts` がテナントスコープの `TenantRow` 型を正典（`../types`）から import せずローカルで再定義していた点を指摘した。指摘自体は軽微だったが、説明のために「`TenantId` が将来ブランド型化されたら重複定義が乖離しうる」という仮定の例を出したところ、**それなら実際にブランド型化しよう**という判断になった。
+- [共有型](./architecture/types.md#2-識別子)の全ID型エイリアス（`TenantId`・`StaffUserId`・`MemberId`・`ApplicationId`・`CheckRunId`・`MatchCandidateId`・`SessionId`・`PeriodKey`・`ImageKey`）を `Brand<string, Name>` 交差型へ変更した。実行時は素の `string` のままで、コンパイラが異なる種類のIDの取り違えを検出する。
+- `toTenantId()` 等の変換関数を境界（`load-config.ts` の環境変数読込、`seed.ts` の固定デモID）に配置し、Drizzle の `schema.ts` 側は各列に `.$type<T>()` を付与して、DB行がORM境界で既にブランド型を持つようにした。これにより `repositories.ts` のジェネリクスは生のDrizzle行型のままブランド型の制約を満たす。
+- [共有型 §2](./architecture/types.md#2-識別子) の[設計判断 #1](./architecture/types.md#設計判断要件に明記がない箇所)を「branding を導入しない」から反転させた。テナント越境の防止は引き続き §9（スコープ済みハンドル、NF-5-6）が担い、branding はそれを代替しない別の保証であるという整理は変えていない。撤回理由は記述量の見積もりが変わったからではなく、branding を見送る根拠として §9 を挙げていたこと自体が誤りだったため。
+- `tsc --noEmit`・`vitest run`（9ファイル・43テスト）・`biome check` で確認し、挙動に変更がないことを確認した。
+
+## 2026-08-28
+
+### Workers無料枠内のログ・例外処理・可観測性設計を確定
+
+- 外部I/O境界をtry/catch/finallyで管理し、catchでは安全な失敗位置を付加して必ず再throwする方針を確定した。
+- 正常時はCloudflareのInvocation Logだけを使用し、429・500・503等の失敗時には最上位境界から構造化ログを1件だけ出す。
+- 1リクエストあたり「Invocation Log 1件＋カスタムログ最大1件」とし、Freeの最大10万リクエスト/日でも20万ログイベント/日以内に収める。
+- failedStageとlastCompletedStageをリクエスト中のメモリで追跡し、開始・途中ログを大量出力せずに処理到達点を特定できる設計とした。
+- Authorization、Cookie、Secret、個人情報、帳票、AIペイロード、SQL・DB値、生のErrorをログへ出さない許可リスト方式を採用した。
+- Workers Logsの保存期間3日に合わせ、商談前後と障害発生後3日以内の確認を運用手順とした。
+- [可観測性設計](./architecture/observability.md)と[判断記録 #19](./requirements/decisions.md#確定事項)へ反映した。
+
 ## 2026-08-27
 
 ### R2原本画像は都度発行する15分の署名付きURLで配信する方針を確定

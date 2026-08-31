@@ -28,3 +28,25 @@ corepack pnpm build
 単一のテストファイルは `corepack pnpm test -- src/worker/index.test.ts` で実行します。ローカル開発サーバーは `corepack pnpm dev`、Cloudflare上でCPU時間を確認するリモート開発は `corepack pnpm dev:remote` を使用します。
 
 `.env.example` を参照して、ローカル開発用の `.dev.vars` を作成してください。実際のAPIキー、Basic認証情報、Googleサービスアカウント秘密鍵、顧客データはコミットしてはいけません。
+
+## デモ用シードデータ
+
+D1マイグレーション適用後、冪等なシードコマンドを実行し、`.dev.vars` の `TENANT_ID` に次の固定IDを設定します。Workerは初回リクエスト時に、設定先のTenantが存在し、Tenantがこの1件だけであることを検証します。
+
+```sh
+corepack pnpm db:migrate
+corepack pnpm db:seed
+```
+
+```dotenv
+TENANT_ID=01J60000000000000000000000
+```
+
+アプリ内ログイン用の合成デモアカウントは次のとおりです。前段のBasic認証とは別の資格情報です。
+
+| ロール | メールアドレス | パスワード |
+|---|---|---|
+| admin | `admin@example.com` | `demo1234` |
+| staff | `staff@example.com` | `demo1234` |
+
+シード会員には実在人物の情報を使っていません。実在する顧客・個人のデータをデモ環境へ投入しないでください。

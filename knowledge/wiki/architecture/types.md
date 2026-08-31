@@ -3,7 +3,7 @@ type: architecture
 title: 共有型定義（SPA ↔ Worker の契約）
 description: ロール・状態・OCR抽出結果・業務チェック・名寄せ・APIのDTO・環境設定・テナントスコープ済みハンドルのTypeScript型定義
 tags: [ai-ocr, typescript, types, contract, api, tenant-isolation]
-timestamp: 2026-08-27T00:00:00Z
+timestamp: 2026-08-31T00:00:00Z
 ---
 
 # 共有型定義（SPA ↔ Worker の契約）
@@ -54,23 +54,37 @@ export type OcrPipelineMode = 'gemini' | 'document-ai-gemini';
 
 ## 2. 識別子
 
+各IDはブランド型（nominal typing）とし、コンパイラが `MemberId` と `ApplicationId` のような異なるID種別の取り違えを検出する。実行時はすべて素の `string` であり、ブランドは型情報としてのみ存在する（実行時の値・シリアライズ形式・DBの列型は変わらない）。
+
 ```ts
-export type TenantId = string;
-export type StaffUserId = string;
-export type MemberId = string;
-export type ApplicationId = string;
-export type CheckRunId = string;
-export type MatchCandidateId = string;
-export type SessionId = string;
+type Brand<Value extends string, Name extends string> = Value & {
+  readonly __brand: Name;
+};
+
+export type TenantId = Brand<string, 'TenantId'>;
+export type StaffUserId = Brand<string, 'StaffUserId'>;
+export type MemberId = Brand<string, 'MemberId'>;
+export type ApplicationId = Brand<string, 'ApplicationId'>;
+export type CheckRunId = Brand<string, 'CheckRunId'>;
+export type MatchCandidateId = Brand<string, 'MatchCandidateId'>;
+export type SessionId = Brand<string, 'SessionId'>;
 
 /** 期間キー `YYYY-MM`（JST）。UsageCounter の PK（NF-2-19） */
-export type PeriodKey = string;
+export type PeriodKey = Brand<string, 'PeriodKey'>;
 
 /** R2オブジェクトキー `{tenantId}/{applicationId}.{ext}`（NF-5-21） */
-export type ImageKey = string;
+export type ImageKey = Brand<string, 'ImageKey'>;
 ```
 
-> 実体はすべて `string` のエイリアスであり、相互代入をコンパイラは防がない。**テナント越境を型で防ぐのは ID の branding ではなく §9 のスコープ済みハンドルである**（NF-5-6）。ID の branding は導入しない（記述量に対して得られる保証が小さいため）。
+生の `string` をブランド付きIDへ変換する入口として、ID種別ごとに `toTenantId` / `toStaffUserId` / `toMemberId` / `toApplicationId` / `toCheckRunId` / `toMatchCandidateId` / `toSessionId` / `toPeriodKey` / `toImageKey` を用意する。いずれも値の形式検証はしない単純なキャストであり、呼び出し側が信頼できる境界（設定読込・DB行・シード用の固定値など）で使う。
+
+```ts
+export declare function toTenantId(value: string): TenantId;
+// toStaffUserId / toMemberId / toApplicationId / toCheckRunId /
+// toMatchCandidateId / toSessionId / toPeriodKey / toImageKey も同型
+```
+
+> **テナント越境を実害から防ぐのは branding ではなく §9 のスコープ済みハンドルである**（NF-5-6）。branding が防ぐのは「異なる種類のIDを引数として取り違える」実装ミスであり、テナント分離の防御層はあくまで §9 が担う。両者は独立した保証であり、branding は §9 を代替しない。
 
 ## 3. OCR 抽出（F-2）
 
@@ -639,7 +653,7 @@ export type ErrorCode =
 
 | # | 判断 | 理由 |
 |---|---|---|
-| 1 | ID の branding を導入しない | テナント越境の防止は §9 のスコープ済みハンドルが担う（NF-5-6）。ID の型分離は記述量に対して得る保証が小さい |
+| 1 | ID にブランド型（nominal typing）を導入する | 異なる種類のIDを引数として取り違えるコンパイル時のミスを防ぐ。テナント越境の防止は引き続き §9 のスコープ済みハンドルが担い（NF-5-6）、branding はそれを代替しない別の保証。`toXxxId()` という単純なキャスト関数を境界に置くだけで導入でき、実行時の値・DB列型は変えない |
 | 2 | `ExtractedApplication` と `ApplicationField` を分ける | `edited` はAIの出力ではない。AIへ要求するスキーマ（AI-6）を型で一意にするため |
 | 3 | `Summary` と `Detail` を分ける | 一覧表示1秒以内（NF-1-3）の余地を確保する。要件は応答の粒度を定めていない |
 | 4 | `letterDraft` を `null` 許容にする | F-3-5 が「不備または矛盾がある場合のみ生成」と定めるため。空文字と混在させない |
@@ -647,6 +661,8 @@ export type ErrorCode =
 | 6 | `ChangeMemberStatusRequest.reason` を必須にする | F-5-7 が「理由を記録する」と定めるため。省略可にすると記録が空のまま運用され得る |
 | 7 | `needsReviewOnly` を `triage` と別のフラグにする | F-4-11 の「要審査のみ」ビューは日常動線であり、フィルタの組み合わせではなく独立した導線として扱う |
 | 8 | `Config` に秘密値を含めない | 設定オブジェクトは画面・ログ・エラーに混入しやすく、載せた時点で NF-2-13 / NF-2-26 の違反経路ができる |
+
+> **#1 は 2026-08-31 に判断を変更した。** 当初は「ID の branding を導入しない（記述量に対して得られる保証が小さい）」としていたが、実装レビューでの指摘を受けて撤回した。撤回理由は記述量の見積もりが変わったためではなく、branding と §9（スコープ済みハンドル）が防ぐ対象は別物であり、branding を省く根拠として §9 を挙げていたこと自体が誤りだったため（[log.md](../log.md#2026-08-31)）。
 
 ## 関連ページ
 

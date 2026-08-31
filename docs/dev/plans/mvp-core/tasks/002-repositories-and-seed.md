@@ -1,7 +1,7 @@
 ---
 id: "002"
 title: "リポジトリ基盤とシードデータを実装"
-status: pending
+status: done
 priority: 1
 dependencies: ["001"]
 estimated_complexity: high
@@ -22,9 +22,10 @@ async function seedDemoData(db: D1Database, config: AppConfig): Promise<void>; /
 
 ## Test Strategy
 
-- [ ] Tenantごとにスコープした取得・更新・削除へ条件が常に付く。
-- [ ] Tenant不存在または本番想定で2件以上なら起動を拒否する。
-- [ ] 固定IDのadmin/staffと「仙臺 一郎」を含む5会員を冪等に投入する。
+- [x] 実D1でTenantごとの取得・更新・削除が他Tenantへ影響しないことを確認した。
+- [x] Tenant不存在または2件以上で初期化を拒否することを確認した。
+- [x] 固定IDのadmin/staffと「仙臺 一郎」を含む5会員を、TS関数とCLIの各経路で冪等に投入できることを確認した。
+- [x] SQLシードとTSシードの値のドリフト、およびREADME記載パスワードとPBKDF2ハッシュの一致を自動テストした。
 
 ## Implementation Notes
 

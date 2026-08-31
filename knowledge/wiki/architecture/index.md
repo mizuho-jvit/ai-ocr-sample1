@@ -10,8 +10,9 @@
 | [api.md](./api.md) | **要件から導出**（正典化元なし） | 全28エンドポイントのメソッド・パス・ロール・要求／応答・ステータスコード、共通のエラー規約 |
 | [types.md](./types.md) | **要件から導出**（正典化元なし） | SPA と Worker が共有する TypeScript 型。列挙型・OCR抽出・業務チェック・名寄せ・DTO・環境設定・スコープ済みハンドル |
 | [dataflow.md](./dataflow.md) | **要件から導出**（正典化元なし） | リクエストの通過順、読取・業務チェック・名寄せの順序、申請と会員の状態遷移、リセット手順（Mermaid） |
+| [observability.md](./observability.md) | **利用者レビューから導出**（正典化元なし） | Workers無料枠内の構造化ログ、try/catch/finally、処理段階追跡、機微情報保護 |
 
-> **末尾3ページは要件定義書の章を正典化したものではない。** [機能要件](../requirements/functional.md)・
+> **末尾4ページは要件定義書の章を正典化したものではない。** [機能要件](../requirements/functional.md)・
 > [非機能要件](../requirements/non-functional.md)・[データモデル](../db/data-model.md)から導出した設計であり、
 > 各記述に根拠の要件IDを付している。要件に明記がない判断は各ページ末尾の「設計判断」節に列挙する。
 

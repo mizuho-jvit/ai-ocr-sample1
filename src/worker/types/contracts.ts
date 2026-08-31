@@ -14,15 +14,40 @@ export type Severity = "error" | "warning";
 
 export type OcrPipelineMode = "gemini" | "document-ai-gemini";
 
-export type TenantId = string;
-export type StaffUserId = string;
-export type MemberId = string;
-export type ApplicationId = string;
-export type CheckRunId = string;
-export type MatchCandidateId = string;
-export type SessionId = string;
-export type PeriodKey = string;
-export type ImageKey = string;
+/**
+ * 生のstringと取り違えられないよう、IDごとにコンパイル時だけ区別する印を付ける。
+ * 実行時は素のstringのまま(ブランドは型情報のみで消去される)。
+ */
+type Brand<Value extends string, Name extends string> = Value & {
+  readonly __brand: Name;
+};
+
+export type TenantId = Brand<string, "TenantId">;
+export type StaffUserId = Brand<string, "StaffUserId">;
+export type MemberId = Brand<string, "MemberId">;
+export type ApplicationId = Brand<string, "ApplicationId">;
+export type CheckRunId = Brand<string, "CheckRunId">;
+export type MatchCandidateId = Brand<string, "MatchCandidateId">;
+export type SessionId = Brand<string, "SessionId">;
+export type PeriodKey = Brand<string, "PeriodKey">;
+export type ImageKey = Brand<string, "ImageKey">;
+
+/**
+ * 検証済みのstringをブランド付きIDへ変換する唯一の入口。
+ * 値の形式検証はしない(呼び出し側が信頼できる境界で値を用意する前提)。
+ */
+export const toTenantId = (value: string): TenantId => value as TenantId;
+export const toStaffUserId = (value: string): StaffUserId =>
+  value as StaffUserId;
+export const toMemberId = (value: string): MemberId => value as MemberId;
+export const toApplicationId = (value: string): ApplicationId =>
+  value as ApplicationId;
+export const toCheckRunId = (value: string): CheckRunId => value as CheckRunId;
+export const toMatchCandidateId = (value: string): MatchCandidateId =>
+  value as MatchCandidateId;
+export const toSessionId = (value: string): SessionId => value as SessionId;
+export const toPeriodKey = (value: string): PeriodKey => value as PeriodKey;
+export const toImageKey = (value: string): ImageKey => value as ImageKey;
 
 export interface TenantRow {
   tenantId: TenantId;

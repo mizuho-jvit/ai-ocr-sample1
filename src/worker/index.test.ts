@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp, type WorkerEnv } from "./index";
+import worker, { createApp, type WorkerEnv } from "./index";
 
 const BASIC_AUTHORIZATION = `Basic ${btoa(
   "test-user:test-password-at-least-20-characters",
@@ -56,5 +56,58 @@ describe("Worker entry point", () => {
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toBe("asset response");
     expect(env.ASSETS.fetch).toHaveBeenCalledOnce();
+    expect(response.headers.get("X-Request-Id")).toBeTruthy();
+  });
+
+  it("returns and logs a safe error when startup validation fails", async () => {
+    const env = createTestEnv();
+    env.TENANT_ID = "";
+    const logError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const request = new Request("https://example.test/") as Parameters<
+      typeof worker.fetch
+    >[0];
+    const response = await worker.fetch(request, env, {} as ExecutionContext);
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("X-Request-Id")).toBeTruthy();
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "INTERNAL",
+        message: "予期しないエラーが発生しました。",
+      },
+    });
+    expect(logError).toHaveBeenCalledOnce();
+    expect(JSON.stringify(logError.mock.calls[0]?.[0])).toContain(
+      "CONFIG_INVALID",
+    );
+    expect(JSON.stringify(logError.mock.calls[0]?.[0])).not.toContain(
+      "TENANT_ID",
+    );
+    logError.mockRestore();
+  });
+
+  it("logs an unexpected Hono error once without exposing its message", async () => {
+    const env = createTestEnv();
+    const secret = "asset-provider-super-secret";
+    env.ASSETS.fetch = vi.fn(() => {
+      throw new Error(secret);
+    }) as unknown as Fetcher["fetch"];
+    const logError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const app = createApp(env);
+
+    const response = await app.fetch(
+      new Request("https://example.test/", {
+        headers: { Authorization: BASIC_AUTHORIZATION },
+      }),
+      env,
+    );
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("X-Request-Id")).toBeTruthy();
+    expect(await response.text()).not.toContain(secret);
+    expect(logError).toHaveBeenCalledOnce();
+    expect(JSON.stringify(logError.mock.calls[0]?.[0])).not.toContain(secret);
+    logError.mockRestore();
   });
 });

@@ -1,9 +1,9 @@
 ---
 type: decision
 title: 判断記録（要求からの変更点と確定事項）
-description: 発注元の要求ドキュメントから変更した12点と、要件定義の過程で判断を要した18件の確定内容
-tags: [ai-ocr, decision, adr, changelog, document-ai]
-timestamp: 2026-08-27T00:00:00Z
+description: 発注元の要求ドキュメントから変更した12点と、要件定義・実装レビューで判断を要した19件の確定内容
+tags: [ai-ocr, decision, adr, changelog, document-ai, observability]
+timestamp: 2026-08-28T00:00:00Z
 ---
 
 # 判断記録（要求からの変更点と確定事項）
@@ -32,7 +32,7 @@ timestamp: 2026-08-27T00:00:00Z
 
 ## 確定事項
 
-**全18件が確定済み（#1〜14: 2026-08-20、#15: 2026-08-21、#16: 2026-08-26、#17: 2026-08-27、#18: 2026-08-27）。仕様上の未確定事項は残っていない。**
+**全19件が確定済み（#1〜14: 2026-08-20、#15: 2026-08-21、#16: 2026-08-26、#17〜18: 2026-08-27、#19: 2026-08-28）。仕様上の未確定事項は残っていない。**
 
 以下は要件定義の作成過程で判断を要した項目と、その確定内容である。いずれも MVP（営業デモ）としての判断であり、**製品版への移行時には再検討の対象となる。**
 
@@ -56,6 +56,7 @@ timestamp: 2026-08-27T00:00:00Z
 | 16 | データモデルの列名と更新の記録 | **同一の役割には同一の列名を使う**（#11 と同じ理由）。`processedById` / `lastEditedById` / `executedById` / `executedAt` / `changedById` / `registeredAt` を `createdAt` / `updatedAt` / `createdById` / `updatedById` へ統一する。**`StaffUser` と `Member` に更新の記録を追加する**（F-7 のスタッフ管理と F-5 の会員編集は人手で運用するが、誰がいつ変更したかを残す手段が無かった）。**追記専用のテーブルには `updatedAt` / `updatedById` を付けない。** `MatchCandidate.decidedById` / `decidedAt` は F-6-9 の業務データであり改名しない。**閲覧の記録は対象外** | [データモデル §列名の規約・監査列](../db/data-model.md#列名の規約) |
 | 17 | 状態値の永続化 | **状態・AI判定は英字文字列コードを TEXT として永続化し、日本語は画面・CSVの表示ラベルに限定する。** 値集合は TypeScript の型と SQLite/D1 の `CHECK` 制約で二重に制限する。遷移可否はサービス層で検証する | [データモデル §状態値の永続化](../db/data-model.md#状態値の永続化) |
 | 18 | 原本画像の一時配信 | **Workerがアプリ内認可とR2キーのテナントprefix検証後、R2 S3互換APIのGET署名URLを都度発行する。** URLは15分で失効し、DB・localStorage・ログへ保存しない。再表示時または失効時は `GET /api/images/:applicationId` で新しいURLを取得する。発行用のAccess Key IDとSecret Access KeyはWorkers Secret、Account IDは通常の環境変数とする | NF-2-14・NF-5-19・[API画像取得](../architecture/api.md#原本画像) |
+| 19 | 無料枠内のログと例外処理 | **Workers Logsを使用し、外部I/O境界をtry/catch/finallyで管理する。正常時はInvocation Logだけ、429・500・503等の失敗時は安全な構造化ログを最上位で1件だけ出す。** 下位層は失敗位置を付加して必ず再throwし、認証情報・個人情報・帳票・AIペイロード・SQL値は記録しない。1リクエスト最大2イベントとして、Freeの10万リクエスト/日と20万ログイベント/日を両立する | [ログ・例外処理・可観測性設計](../architecture/observability.md) |
 
 ## 撤回した判断
 

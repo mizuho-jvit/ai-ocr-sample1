@@ -9,6 +9,16 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import type {
+  ApplicationId,
+  CheckRunId,
+  MatchCandidateId,
+  MemberId,
+  PeriodKey,
+  SessionId,
+  StaffUserId,
+  TenantId,
+} from "../types";
 
 const APP_STATUS_VALUES = "'received', 'under_review', 'approved', 'returned'";
 const MEMBER_STATUS_VALUES = "'pending', 'active', 'suspended', 'inactive'";
@@ -29,7 +39,7 @@ const updatedAt = (name = "updated_at") =>
 export const tenants = sqliteTable(
   "tenants",
   {
-    id: text("id").primaryKey(),
+    id: text("id").$type<TenantId>().primaryKey(),
     code: text("code").notNull(),
     name: text("name").notNull(),
     createdAt: createdAt(),
@@ -41,8 +51,9 @@ export const tenants = sqliteTable(
 export const staffUsers = sqliteTable(
   "staff_users",
   {
-    id: text("id").primaryKey(),
+    id: text("id").$type<StaffUserId>().primaryKey(),
     tenantId: text("tenant_id")
+      .$type<TenantId>()
       .notNull()
       .references(() => tenants.id),
     email: text("email").notNull(),
@@ -54,12 +65,12 @@ export const staffUsers = sqliteTable(
     lockedUntil: text("locked_until"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
-    createdById: text("created_by_id").references(
-      (): AnySQLiteColumn => staffUsers.id,
-    ),
-    updatedById: text("updated_by_id").references(
-      (): AnySQLiteColumn => staffUsers.id,
-    ),
+    createdById: text("created_by_id")
+      .$type<StaffUserId>()
+      .references((): AnySQLiteColumn => staffUsers.id),
+    updatedById: text("updated_by_id")
+      .$type<StaffUserId>()
+      .references((): AnySQLiteColumn => staffUsers.id),
   },
   (table) => [
     uniqueIndex("staff_users_tenant_email_unique").on(
@@ -73,8 +84,9 @@ export const staffUsers = sqliteTable(
 export const members = sqliteTable(
   "members",
   {
-    id: text("id").primaryKey(),
+    id: text("id").$type<MemberId>().primaryKey(),
     tenantId: text("tenant_id")
+      .$type<TenantId>()
       .notNull()
       .references(() => tenants.id),
     memberNumber: text("member_number").notNull(),
@@ -91,8 +103,12 @@ export const members = sqliteTable(
     isSeed: integer("is_seed", { mode: "boolean" }).notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
-    createdById: text("created_by_id").references(() => staffUsers.id),
-    updatedById: text("updated_by_id").references(() => staffUsers.id),
+    createdById: text("created_by_id")
+      .$type<StaffUserId>()
+      .references(() => staffUsers.id),
+    updatedById: text("updated_by_id")
+      .$type<StaffUserId>()
+      .references(() => staffUsers.id),
   },
   (table) => [
     uniqueIndex("members_tenant_member_number_unique").on(
@@ -118,26 +134,32 @@ export const members = sqliteTable(
 export const applications = sqliteTable(
   "applications",
   {
-    id: text("id").primaryKey(),
+    id: text("id").$type<ApplicationId>().primaryKey(),
     tenantId: text("tenant_id")
+      .$type<TenantId>()
       .notNull()
       .references(() => tenants.id),
     docType: text("doc_type").notNull(),
     fieldsJson: text("fields_json").notNull(),
     imageKey: text("image_key"),
     appStatus: text("app_status").notNull().default("received"),
-    latestCheckRunId: text("latest_check_run_id").references(
-      (): AnySQLiteColumn => checkRuns.id,
-    ),
+    latestCheckRunId: text("latest_check_run_id")
+      .$type<CheckRunId>()
+      .references((): AnySQLiteColumn => checkRuns.id),
     editedCount: integer("edited_count").notNull().default(0),
     processingSec: real("processing_sec").notNull(),
-    memberId: text("member_id").references(() => members.id),
+    memberId: text("member_id")
+      .$type<MemberId>()
+      .references(() => members.id),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     createdById: text("created_by_id")
+      .$type<StaffUserId>()
       .notNull()
       .references(() => staffUsers.id),
-    updatedById: text("updated_by_id").references(() => staffUsers.id),
+    updatedById: text("updated_by_id")
+      .$type<StaffUserId>()
+      .references(() => staffUsers.id),
   },
   (table) => [
     check(
@@ -150,11 +172,13 @@ export const applications = sqliteTable(
 export const checkRuns = sqliteTable(
   "check_runs",
   {
-    id: text("id").primaryKey(),
+    id: text("id").$type<CheckRunId>().primaryKey(),
     tenantId: text("tenant_id")
+      .$type<TenantId>()
       .notNull()
       .references(() => tenants.id),
     applicationId: text("application_id")
+      .$type<ApplicationId>()
       .notNull()
       .references((): AnySQLiteColumn => applications.id),
     triage: text("triage").notNull(),
@@ -164,6 +188,7 @@ export const checkRuns = sqliteTable(
     letterDraft: text("letter_draft"),
     createdAt: createdAt(),
     createdById: text("created_by_id")
+      .$type<StaffUserId>()
       .notNull()
       .references(() => staffUsers.id),
   },
@@ -178,21 +203,26 @@ export const checkRuns = sqliteTable(
 export const matchCandidates = sqliteTable(
   "match_candidates",
   {
-    id: text("id").primaryKey(),
+    id: text("id").$type<MatchCandidateId>().primaryKey(),
     tenantId: text("tenant_id")
+      .$type<TenantId>()
       .notNull()
       .references(() => tenants.id),
     applicationId: text("application_id")
+      .$type<ApplicationId>()
       .notNull()
       .references(() => applications.id),
     memberId: text("member_id")
+      .$type<MemberId>()
       .notNull()
       .references(() => members.id),
     ruleScore: real("rule_score").notNull(),
     aiLikelihood: text("ai_likelihood"),
     aiReason: text("ai_reason"),
     status: text("status").notNull().default("pending"),
-    decidedById: text("decided_by_id").references(() => staffUsers.id),
+    decidedById: text("decided_by_id")
+      .$type<StaffUserId>()
+      .references(() => staffUsers.id),
     decidedAt: text("decided_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -218,9 +248,11 @@ export const appStatusHistory = sqliteTable(
   {
     id: text("id").primaryKey(),
     tenantId: text("tenant_id")
+      .$type<TenantId>()
       .notNull()
       .references(() => tenants.id),
     applicationId: text("application_id")
+      .$type<ApplicationId>()
       .notNull()
       .references(() => applications.id),
     fromStatus: text("from_status"),
@@ -228,6 +260,7 @@ export const appStatusHistory = sqliteTable(
     note: text("note"),
     createdAt: createdAt(),
     createdById: text("created_by_id")
+      .$type<StaffUserId>()
       .notNull()
       .references(() => staffUsers.id),
   },
@@ -248,9 +281,11 @@ export const statusHistory = sqliteTable(
   {
     id: text("id").primaryKey(),
     tenantId: text("tenant_id")
+      .$type<TenantId>()
       .notNull()
       .references(() => tenants.id),
     memberId: text("member_id")
+      .$type<MemberId>()
       .notNull()
       .references(() => members.id),
     fromStatus: text("from_status"),
@@ -258,6 +293,7 @@ export const statusHistory = sqliteTable(
     reason: text("reason"),
     createdAt: createdAt(),
     createdById: text("created_by_id")
+      .$type<StaffUserId>()
       .notNull()
       .references(() => staffUsers.id),
   },
@@ -274,11 +310,13 @@ export const statusHistory = sqliteTable(
 );
 
 export const sessions = sqliteTable("sessions", {
-  id: text("id").primaryKey(),
+  id: text("id").$type<SessionId>().primaryKey(),
   tenantId: text("tenant_id")
+    .$type<TenantId>()
     .notNull()
     .references(() => tenants.id),
   staffUserId: text("staff_user_id")
+    .$type<StaffUserId>()
     .notNull()
     .references(() => staffUsers.id),
   expiresAt: text("expires_at").notNull(),
@@ -286,7 +324,7 @@ export const sessions = sqliteTable("sessions", {
 });
 
 export const usageCounter = sqliteTable("usage_counter", {
-  period: text("period").primaryKey(),
+  period: text("period").$type<PeriodKey>().primaryKey(),
   ocrPages: integer("ocr_pages").notNull().default(0),
   geminiCalls: integer("gemini_calls").notNull().default(0),
   updatedAt: updatedAt(),

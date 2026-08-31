@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { AppConfig } from "../types";
+import { type AppConfig, toTenantId } from "../types";
 import { currentTenantId } from "./tenant-context";
+
+const TENANT_FROM_CONFIG = toTenantId("tenant-from-config");
 
 const CONFIG: AppConfig = {
   allowDataReset: false,
@@ -10,14 +12,14 @@ const CONFIG: AppConfig = {
   maxOcrPagesPerMonth: 120,
   ocrPipelineMode: "gemini",
   pbkdf2Iterations: 100_000,
-  tenantId: "tenant-from-config",
+  tenantId: TENANT_FROM_CONFIG,
 };
 
 describe("currentTenantId", () => {
   it("returns only the tenant selected by validated configuration", () => {
-    const requestControlledTenantId = "tenant-from-request";
+    const requestControlledTenantId = toTenantId("tenant-from-request");
 
-    expect(currentTenantId(CONFIG)).toBe("tenant-from-config");
+    expect(currentTenantId(CONFIG)).toBe(TENANT_FROM_CONFIG);
     expect(currentTenantId(CONFIG)).not.toBe(requestControlledTenantId);
   });
 });

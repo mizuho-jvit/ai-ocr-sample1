@@ -1,4 +1,9 @@
-import type { AppConfig, OcrPipelineMode, WorkerEnv } from "../types";
+import {
+  type AppConfig,
+  type OcrPipelineMode,
+  toTenantId,
+  type WorkerEnv,
+} from "../types";
 
 const MINIMUM_PASSWORD_LENGTH = 20;
 const MINIMUM_PRODUCTION_PBKDF2_ITERATIONS = 100_000;
@@ -117,6 +122,6 @@ export function loadConfig(env: WorkerEnv): AppConfig {
     maxOcrPagesPerMonth: requirePositiveInteger(env, "MAX_OCR_PAGES_PER_MONTH"),
     ocrPipelineMode,
     pbkdf2Iterations,
-    tenantId: requireSetting(env, "TENANT_ID"),
+    tenantId: toTenantId(requireSetting(env, "TENANT_ID")),
   };
 }

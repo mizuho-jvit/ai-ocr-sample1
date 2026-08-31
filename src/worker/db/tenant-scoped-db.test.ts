@@ -1,9 +1,10 @@
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
-import type {
-  SqlExpr,
-  TenantInsertValues,
-  TenantRow,
-  TenantUpdateValues,
+import {
+  type SqlExpr,
+  type TenantInsertValues,
+  type TenantRow,
+  type TenantUpdateValues,
+  toTenantId,
 } from "../types";
 import {
   createForTenant,
@@ -15,6 +16,9 @@ interface TestRow extends TenantRow {
   id: string;
   name: string;
 }
+
+const TENANT_A = toTenantId("tenant-a");
+const TENANT_B = toTenantId("tenant-b");
 
 function createExecutor(): TenantScopedExecutor {
   return {
@@ -31,7 +35,7 @@ const CALLER_WHERE = { source: "caller" } as unknown as SqlExpr;
 describe("tenant-scoped database boundary", () => {
   it("adds an immutable tenant predicate to every read, update, and delete", async () => {
     const executor = createExecutor();
-    const db = forTenant("tenant-a", executor);
+    const db = forTenant(TENANT_A, executor);
 
     await db.select<TestRow>("members", CALLER_WHERE);
     await db.selectOne<TestRow>("members", CALLER_WHERE);
@@ -41,7 +45,7 @@ describe("tenant-scoped database boundary", () => {
     const expectedWhere = {
       additional: CALLER_WHERE,
       operator: "and",
-      tenant: { column: "tenantId", operator: "eq", value: "tenant-a" },
+      tenant: { column: "tenantId", operator: "eq", value: TENANT_A },
     };
     expect(executor.select).toHaveBeenCalledWith("members", expectedWhere);
     expect(executor.selectOne).toHaveBeenCalledWith("members", expectedWhere);
@@ -60,10 +64,10 @@ describe("tenant-scoped database boundary", () => {
   it("keeps caller tenant predicates additive instead of replacing the scope", async () => {
     const executor = createExecutor();
     const conflictingWhere = {
-      tenantId: "tenant-b",
+      tenantId: TENANT_B,
     } as unknown as SqlExpr;
 
-    await forTenant("tenant-a", executor).select<TestRow>(
+    await forTenant(TENANT_A, executor).select<TestRow>(
       "members",
       conflictingWhere,
     );
@@ -71,29 +75,29 @@ describe("tenant-scoped database boundary", () => {
     expect(executor.select).toHaveBeenCalledWith("members", {
       additional: conflictingWhere,
       operator: "and",
-      tenant: { column: "tenantId", operator: "eq", value: "tenant-a" },
+      tenant: { column: "tenantId", operator: "eq", value: TENANT_A },
     });
   });
 
   it("injects tenantId on insert and strips it from update at runtime", async () => {
     const executor = createExecutor();
-    const db = createForTenant(executor)("tenant-a");
+    const db = createForTenant(executor)(TENANT_A);
 
     await db.insert<TestRow>("members", {
       id: "member-1",
       name: "member",
-      tenantId: "tenant-b",
+      tenantId: TENANT_B,
     } as unknown as TenantInsertValues<TestRow>);
     await db.update<TestRow>(
       "members",
-      { name: "updated", tenantId: "tenant-b" } as TenantUpdateValues<TestRow>,
+      { name: "updated", tenantId: TENANT_B } as TenantUpdateValues<TestRow>,
       CALLER_WHERE,
     );
 
     expect(executor.insert).toHaveBeenCalledWith("members", {
       id: "member-1",
       name: "member",
-      tenantId: "tenant-a",
+      tenantId: TENANT_A,
     });
     expect(executor.update).toHaveBeenCalledWith(
       "members",
@@ -114,6 +118,8 @@ describe("tenant-scoped database boundary", () => {
   });
 
   it("rejects an empty tenant scope", () => {
-    expect(() => forTenant("  ", createExecutor())).toThrowError("tenantId");
+    expect(() => forTenant(toTenantId("  "), createExecutor())).toThrowError(
+      "tenantId",
+    );
   });
 });
