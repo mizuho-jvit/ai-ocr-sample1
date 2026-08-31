@@ -27,7 +27,7 @@ corepack pnpm build
 
 単一のテストファイルは `corepack pnpm test -- src/worker/index.test.ts` で実行します。ローカル開発サーバーは `corepack pnpm dev`、Cloudflare上でCPU時間を確認するリモート開発は `corepack pnpm dev:remote` を使用します。
 
-`.env.example` を参照して、ローカル開発用の `.dev.vars` を作成してください。実際のAPIキー、Basic認証情報、Googleサービスアカウント秘密鍵、顧客データはコミットしてはいけません。
+ローカル開発用の `.dev.vars` を作成してください。設定すべき環境変数・SecretとMVPでの値は [環境変数の一覧](knowledge/wiki/requirements/non-functional.md#環境変数の一覧統合) を参照してください。実際のAPIキー、Basic認証情報、Googleサービスアカウント秘密鍵、顧客データはコミットしてはいけません。
 
 ## デモ用シードデータ
 
