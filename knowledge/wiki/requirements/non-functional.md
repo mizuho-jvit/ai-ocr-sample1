@@ -3,7 +3,7 @@ type: requirement
 title: 非機能要件（性能・セキュリティ・データ保持・保守性）
 description: MVP 1.0／1.1のOCR性能目標、PBKDF2、AI呼び出し上限、Document AI認証、原本画像の30日保持、環境変数一覧
 tags: [ai-ocr, non-functional, security, pbkdf2, cost-control, performance, document-ai]
-timestamp: 2026-08-20T00:00:00Z
+timestamp: 2026-08-31T00:00:00Z
 ---
 
 # 非機能要件（性能・セキュリティ・データ保持・保守性）
@@ -131,7 +131,7 @@ NF-2-15 は Cloudflare 側の最終的な歯止めであり、到達した時点
 
 ## 環境変数の一覧（統合）
 
-各要件に散在している環境変数・Secretを1箇所にまとめたもの。未設定または条件未充足で起動失敗する項目が複数あるため、`.env.example` とデプロイ手順に必ず含める。秘密値は `.env.example` にプレースホルダだけを記載する。
+各要件に散在している環境変数・Secretを1箇所にまとめたもの。未設定または条件未充足で起動失敗する項目が複数あるため、開発者は本表を参照して `.dev.vars` を作成する（[README](../../../README.md#セットアップと開発)）。秘密値の実際の値は本表・READMEのいずれにも書かない。
 
 | 環境変数 | MVP の値 | 未設定時 | 定義元 |
 |---|---|---|---|

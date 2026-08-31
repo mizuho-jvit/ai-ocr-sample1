@@ -33,4 +33,4 @@ type DemoScenario = "login" | "ocr-to-approval" | "reset"; // 🔵
 ## Files
 
 - 新規: `test/e2e/**`, `docs/dev/plans/mvp-core/reports/**`
-- 変更: `README.md`, `.env.example`, `.github/workflows/ci.yml`
+- 変更: `README.md`, `.github/workflows/ci.yml`

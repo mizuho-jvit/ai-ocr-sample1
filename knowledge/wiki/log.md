@@ -12,6 +12,14 @@
 - [共有型 §2](./architecture/types.md#2-識別子) の[設計判断 #1](./architecture/types.md#設計判断要件に明記がない箇所)を「branding を導入しない」から反転させた。テナント越境の防止は引き続き §9（スコープ済みハンドル、NF-5-6）が担い、branding はそれを代替しない別の保証であるという整理は変えていない。撤回理由は記述量の見積もりが変わったからではなく、branding を見送る根拠として §9 を挙げていたこと自体が誤りだったため。
 - `tsc --noEmit`・`vitest run`（9ファイル・43テスト）・`biome check` で確認し、挙動に変更がないことを確認した。
 
+### `.env.example` を廃止し、環境変数一覧の正典を Wiki に一本化した
+
+- `.env.example` を削除する方針とし、`.gitignore` の `!.env.example` 例外を削除して `.env.*` の対象に含めた（ファイル自体は既に追跡済みのため、この変更だけでは追跡から外れない）。
+- [非機能要件「環境変数の一覧（統合）」](./requirements/non-functional.md#環境変数の一覧統合)の説明文が「`.env.example` とデプロイ手順に必ず含める」と `.env.example` の存在を前提にしていたため、「開発者は本表を参照して `.dev.vars` を作成する」へ書き換えた。**この表自体が環境変数一覧の唯一の正典になる。**
+- `README.md` の `.dev.vars` 作成手順を、`.env.example` 参照から上記Wikiページへのリンクへ差し替えた。
+- 未着手タスクの `docs/dev/plans/mvp-core/tasks/016-e2e-performance-operations.md`・`018-document-ai-pipeline.md` の Files 節から `.env.example` を除去した。**完了済みの `001-contracts-config-tenant.md` は当時の実績記録のため書き換えていない。**
+- `.env.example` の実ファイル削除はまだ実行していない（別途 `git rm` で対応）。
+
 ## 2026-08-28
 
 ### Workers無料枠内のログ・例外処理・可観測性設計を確定

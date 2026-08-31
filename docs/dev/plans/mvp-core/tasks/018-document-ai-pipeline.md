@@ -37,5 +37,5 @@ class DocumentAiGeminiPipeline implements OcrPipeline { // 🔵
 ## Files
 
 - 新規: `src/worker/services/document-ai-client.ts`
-- 変更: `src/worker/{config,services/ocr-pipeline}.ts`, `.env.example`, `README.md`
+- 変更: `src/worker/{config,services/ocr-pipeline}.ts`, `README.md`
 - テスト: `src/worker/services/document-ai-pipeline.test.ts`
