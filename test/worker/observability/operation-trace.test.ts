@@ -4,7 +4,7 @@ import {
   createOperationTrace,
   executeOperation,
   finalizeOperationTrace,
-} from "./operation-trace";
+} from "../../../src/worker/observability/operation-trace";
 
 describe("operation trace", () => {
   it("records the last completed and failed stages and always finalizes", async () => {

@@ -1,9 +1,15 @@
 import { Hono } from "hono";
 import { basicAuth } from "hono/basic-auth";
 import { HTTPException } from "hono/http-exception";
+import { routePath } from "hono/route";
 
 import { loadConfig } from "./config/load-config";
-import { initializeTenantRepository } from "./db/repositories";
+import {
+  createTenantRepository,
+  initializeTenantRepository,
+  type TenantRepository,
+} from "./db/repositories";
+import { type AppHonoEnv, sessionGuard } from "./middleware/auth";
 import { emitRequestLog } from "./observability/logger";
 import {
   createOperationTrace,
@@ -12,6 +18,11 @@ import {
   type OperationTrace,
 } from "./observability/operation-trace";
 import {
+  createProtectedAuthRoutes,
+  createPublicAuthRoutes,
+} from "./routes/auth";
+import { createAuthService } from "./services/auth";
+import {
   type AppConfig,
   apiErrorStatus,
   toApiError,
@@ -19,11 +30,6 @@ import {
 } from "./types";
 
 export type { WorkerEnv } from "./types";
-
-type HonoEnvironment = {
-  Bindings: WorkerEnv;
-  Variables: { config: AppConfig; trace: OperationTrace };
-};
 
 const databaseInitialization = new WeakMap<D1Database, Promise<void>>();
 
@@ -71,13 +77,17 @@ export function createApp(
   env: WorkerEnv,
   config: AppConfig = loadConfig(env),
   providedTrace?: OperationTrace,
-): Hono<HonoEnvironment> {
-  const app = new Hono<HonoEnvironment>();
+  providedRepository?: TenantRepository,
+): Hono<AppHonoEnv> {
+  const app = new Hono<AppHonoEnv>();
 
   app.use("*", async (context, next) => {
     const trace = providedTrace ?? createOperationTrace(context.req.raw);
+    const repository =
+      providedRepository ?? createTenantRepository(env.DB, trace);
     context.set("config", config);
     context.set("trace", trace);
+    context.set("auth", createAuthService({ config, repository }));
     try {
       await executeOperation(
         trace,
@@ -106,6 +116,18 @@ export function createApp(
     }),
   );
 
+  // 認証不要なのはログインだけ。ここへ足すとBasic認証だけで到達できるようになる。
+  app.route("/api/auth", createPublicAuthRoutes());
+
+  // sessionGuard() をハンドラより先に登録することで、この配下へ足したAPIは
+  // 構成上必ずアプリ内セッションを要求する（NF-2-10・F-1-12）。
+  // 今後の業務API（/usage・/ocr/*・/applications/* など）はすべてここへ足す。
+  const protectedApi = new Hono<AppHonoEnv>();
+  protectedApi.use("*", sessionGuard());
+  protectedApi.route("/auth", createProtectedAuthRoutes());
+  // app.route はサブアプリのスナップショットを再生するため、搭載は登録の後に行う。
+  app.route("/api", protectedApi);
+
   app.onError((error, context) => {
     const trace = context.get("trace");
     if (error instanceof HTTPException && error.status === 401) {
@@ -117,7 +139,7 @@ export function createApp(
       errorCode: toApiError(error).error.code,
       httpMethod: context.req.method,
       httpStatus: response.status,
-      routePattern: context.req.routePath,
+      routePattern: routePath(context),
     });
     finalizeOperationTrace(trace, "request.failed");
     return withRequestId(response, trace.requestId);

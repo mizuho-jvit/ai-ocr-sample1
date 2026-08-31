@@ -1,7 +1,10 @@
 name = "ai-ocr-sample1"
 main = "./src/worker/index.ts"
-# ローカルのworkerdが対応する最新日付。依存更新時に見直す。
-compatibility_date = "2026-08-22"
+# 開発サーバーのworkerdが対応する最新日付。
+# `@cloudflare/vite-plugin` は workerd / miniflare を自身の dependencies に固定するため、
+# ルートの wrangler を上げてもこの下限は動かない。プラグインを上げるまでこの日付を超えられない。
+# 依存更新時は `@cloudflare/vite-plugin` の workerd バージョンを見て見直す。
+compatibility_date = "2026-08-18"
 
 [observability]
 enabled = true

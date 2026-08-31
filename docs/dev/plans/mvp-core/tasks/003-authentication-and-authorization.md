@@ -1,7 +1,7 @@
 ---
 id: "003"
 title: "アプリ内認証・セッション・ロール認可を実装"
-status: pending
+status: done
 priority: 1
 dependencies: ["002"]
 estimated_complexity: high
@@ -23,10 +23,11 @@ function requireAdmin(actor: SessionActor): void; // 🔵
 
 ## Test Strategy
 
-- [ ] 正しい資格情報でSecure/HTTPOnly/SameSite=Lax CookieとD1セッションを作る。
-- [ ] 不正、無効、ロック中の全てで同じ401文言を返す。
-- [ ] 5連続失敗で15分ロックし、成功時はカウンタを戻して必要なら再ハッシュする。
-- [ ] 未認証は401、staffのadmin APIは403、logout後は401となる。
+- [x] 正しい資格情報でSecure/HTTPOnly/SameSite=Lax CookieとD1セッションを作る。
+- [x] 不正、無効、ロック中の全てで同じ401文言を返す。
+- [x] 5連続失敗で15分ロックし、成功時はカウンタを戻して必要なら再ハッシュする。
+- [x] 未認証は401、staffのadmin APIは403、logout後は401となる。
+      admin専用APIの実体はTask 012。ここでは `requireAdmin` を付けたルートで403を検証している。
 
 ## Implementation Notes
 
@@ -37,4 +38,4 @@ function requireAdmin(actor: SessionActor): void; // 🔵
 
 - 新規: `src/worker/{services/auth.ts,routes/auth.ts,middleware/auth.ts}`
 - 変更: `src/worker/index.ts`
-- テスト: `src/worker/{services/auth,routes/auth,middleware/auth}.test.ts`
+- テスト: `test/worker/{services/auth,routes/auth,middleware/auth}.test.ts`

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import worker, { createApp, type WorkerEnv } from "./index";
+import worker, { createApp, type WorkerEnv } from "../../src/worker/index";
 
 const BASIC_AUTHORIZATION = `Basic ${btoa(
   "test-user:test-password-at-least-20-characters",

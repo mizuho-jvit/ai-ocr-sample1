@@ -1,6 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { AppShell } from "./components/app-shell";
+import { AuthGuard } from "./components/auth-guard";
+import "./styles/theme.css";
+
 const rootElement = document.getElementById("root");
 
 if (rootElement === null) {
@@ -9,9 +13,8 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <main>
-      <h1>AI-OCR 帳票読取・一次審査</h1>
-      <p>アプリケーションを準備しています。</p>
-    </main>
+    <AuthGuard>
+      <AppShell />
+    </AuthGuard>
   </StrictMode>,
 );

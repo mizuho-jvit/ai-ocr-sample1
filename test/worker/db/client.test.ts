@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { whereEquals } from "./client";
+import { whereEquals } from "../../../src/worker/db/client";
 
 describe("whereEquals", () => {
   it("builds a predicate for a real column", () => {

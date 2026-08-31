@@ -35,4 +35,4 @@ function createPresignedImageUrl(key: string, expiresInSeconds: 900): Promise<st
 ## Files
 
 - 新規: `src/worker/{routes/ocr.ts,services/image-storage.ts}`, `src/react-app/{api/ocr.ts,pages/ocr-page.tsx}`
-- テスト: `src/worker/routes/ocr.test.ts`, `src/react-app/**/*.test.tsx`
+- テスト: `test/worker/routes/ocr.test.ts`, `test/react-app/**/*.test.tsx`

@@ -64,7 +64,7 @@ Wiki の構造・編集規約は `knowledge/SCHEMA.md`(憲法)と `knowledge/OKF
 corepack pnpm install
 corepack pnpm lint
 corepack pnpm test
-corepack pnpm test -- src/worker/index.test.ts
+corepack pnpm test -- test/worker/index.test.ts
 corepack pnpm build
 ```
 

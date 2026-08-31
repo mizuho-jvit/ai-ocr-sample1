@@ -34,4 +34,4 @@ function resetDemoData(input: ResetRequest, actor: SessionActor): Promise<ResetR
 ## Files
 
 - 新規: `src/worker/{services/demo-reset.ts,routes/demo.ts}`, `src/react-app/pages/reset-page.tsx`
-- テスト: `src/worker/services/demo-reset.test.ts`
+- テスト: `test/worker/services/demo-reset.test.ts`

@@ -35,4 +35,4 @@ function importMembers(file: File, actor: SessionActor): Promise<ImportMembersRe
 
 - 新規: `src/worker/{services/csv.ts,routes/csv.ts}`
 - 変更: `src/worker/routes/{applications,members}.ts`
-- テスト: `src/worker/services/csv.test.ts`
+- テスト: `test/worker/services/csv.test.ts`

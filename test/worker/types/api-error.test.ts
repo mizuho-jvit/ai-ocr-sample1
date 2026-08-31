@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { toApiError } from "./api-error";
+import { toApiError } from "../../../src/worker/types/api-error";
 
 describe("toApiError", () => {
   it("does not expose an unexpected error message", () => {

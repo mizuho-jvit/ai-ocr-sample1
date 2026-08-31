@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { emitRequestLog } from "./logger";
+import { emitRequestLog } from "../../../src/worker/observability/logger";
 import {
   createOperationTrace,
   recordOperationFailure,
-} from "./operation-trace";
+} from "../../../src/worker/observability/operation-trace";
 
 describe("structured logger", () => {
   it("emits at most one safe structured event per request", () => {

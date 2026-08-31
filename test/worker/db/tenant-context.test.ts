@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { type AppConfig, toTenantId } from "../types";
-import { currentTenantId } from "./tenant-context";
+import { currentTenantId } from "../../../src/worker/db/tenant-context";
+import { type AppConfig, toTenantId } from "../../../src/worker/types";
 
 const TENANT_FROM_CONFIG = toTenantId("tenant-from-config");
 

@@ -1,11 +1,17 @@
-import { and, eq, type SQL } from "drizzle-orm";
+import { and, eq, type SQL, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 import {
   executeOperation,
   type OperationTrace,
 } from "../observability/operation-trace";
-import type { ScopedDb, SqlExpr, TenantId, TenantScopedTable } from "../types";
+import type {
+  ScopedDb,
+  SqlExpr,
+  StaffUserId,
+  TenantId,
+  TenantScopedTable,
+} from "../types";
 import {
   applications,
   appStatusHistory,
@@ -213,6 +219,81 @@ export function whereEquals(
     columnName
   ];
   return drizzleWhere(eq(column, value));
+}
+
+export interface LoginFailureState {
+  readonly failedLoginCount: number;
+  readonly lockedUntil: string | null;
+}
+
+const STAFF_UPDATE_OPERATION = {
+  component: "repository",
+  completedStage: "repository.completed",
+  errorType: "D1_OPERATION_FAILED",
+  operation: "staff_users.update",
+  startedStage: "repository.executing",
+  table: "staff_users",
+} as const;
+
+/**
+ * 🔵 Intent: F-1-6のロック満了解除を、読み取った値と完全一致するときだけ行う。
+ * 並行リクエストが直前に張り直したロックを消さないためのcompare-and-swap。
+ * `locked_until` が非NULLの場合だけ呼ばれるため、SQLiteのNULL比較を踏まない。
+ */
+export async function clearExpiredLoginLock(
+  database: D1Database,
+  tenantId: TenantId,
+  staffUserId: StaffUserId,
+  expiredLockedUntil: string,
+  trace?: OperationTrace,
+): Promise<void> {
+  await executeOperation(trace, STAFF_UPDATE_OPERATION, async () => {
+    const client = drizzle(database);
+    await client
+      .update(staffUsers)
+      .set({ failedLoginCount: 0, lockedUntil: null })
+      .where(
+        and(
+          eq(staffUsers.tenantId, tenantId),
+          eq(staffUsers.id, staffUserId),
+          eq(staffUsers.lockedUntil, expiredLockedUntil),
+        ),
+      );
+  });
+}
+
+/**
+ * 🔵 Intent: 失敗回数の加算と上限判定を単一のUPDATEで行う（NF-2-39と同じ規律）。
+ * 読み取ってから加算する実装では、並行リクエストがF-1-6のロックを回避できる。
+ * `locked_until` のELSEを既存値にしてあるのが要点で、NULLにすると
+ * 直前に別リクエストが張ったロックを消す別の回避経路が開く。
+ */
+export async function registerLoginFailure(
+  database: D1Database,
+  tenantId: TenantId,
+  staffUserId: StaffUserId,
+  input: { lockThreshold: number; lockedUntil: string },
+  trace?: OperationTrace,
+): Promise<LoginFailureState | null> {
+  return executeOperation(trace, STAFF_UPDATE_OPERATION, async () => {
+    const client = drizzle(database);
+    // SQLiteはUPDATEの右辺を更新前の行に対して評価するため、
+    // `failed_login_count + 1` はSET句とCASE句のどちらでも加算後の値になる。
+    const rows = await client
+      .update(staffUsers)
+      .set({
+        failedLoginCount: sql`${staffUsers.failedLoginCount} + 1`,
+        lockedUntil: sql`CASE WHEN ${staffUsers.failedLoginCount} + 1 >= ${input.lockThreshold} THEN ${input.lockedUntil} ELSE ${staffUsers.lockedUntil} END`,
+      })
+      .where(
+        and(eq(staffUsers.tenantId, tenantId), eq(staffUsers.id, staffUserId)),
+      )
+      .returning({
+        failedLoginCount: staffUsers.failedLoginCount,
+        lockedUntil: staffUsers.lockedUntil,
+      });
+    return rows[0] ?? null;
+  });
 }
 
 /** 🔵 Intent: Tenant起動検証のD1読取も共通の例外追跡境界へ通す。 */

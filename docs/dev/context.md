@@ -23,12 +23,20 @@
 
 | Item | Value |
 |---|---|
-| Framework | Vitest 4 + `@cloudflare/vitest-pool-workers`（workerd） |
+| Framework | Vitest 4。`test.projects` で2プロジェクトに分割 |
 | Config file | `vitest.config.ts`（`wrangler.toml`を参照） |
-| Test files | `src/**/*.test.ts` |
-| Current coverage | `src/worker/index.test.ts`: Basic認証とASSETS委譲の2テスト |
+| `worker` project | `@cloudflare/vitest-pool-workers`（workerd上）。対象は `test/worker/**/*.test.ts` |
+| `react-app` project | `happy-dom` + `@testing-library/react`。対象は `test/react-app/**/*.test.{ts,tsx}`。setup は `test/react-app/test-setup.ts` |
 | Test command | `corepack pnpm test` |
-| Single test | `corepack pnpm test -- src/worker/index.test.ts` |
+| Single test | `corepack pnpm test -- test/worker/index.test.ts` |
+| Single project | `corepack pnpm test -- --project react-app` |
+| Coverage | 閾値は未設定（coverage provider も未導入） |
+
+**プロジェクトを分ける理由:** `cloudflareTest()` を全体へ適用するとSPAのテストもworkerd上で動きDOMが無いため描画テストが書けない。逆にSPA側へworkerdプールを適用しない限り、WorkerテストのD1・R2バインディングは得られない。`include` はディレクトリで完全に分離する。
+
+SPAからWorkerの型は `import type` でのみ共有する（`src/worker/types/contracts.ts`）。実行時コードはSPAへ持ち込まない。
+
+**テストは `test/` へ分離し、`src/` と同じディレクトリ構成をミラーする**（AGENTS.mdの規約）。importグラフに乗らないためビルド成果物には元々含まれないが、本体とテストのディレクトリを分けて見通しやすくする。
 
 WorkersテストはローカルポートとWranglerログへの書込みを必要とする。sandboxで失敗した場合は、権限昇格した実行環境で再実行する。
 
@@ -37,17 +45,28 @@ WorkersテストはローカルポートとWranglerログへの書込みを必�
 ```text
 src/
 ├── react-app/
-│   ├── main.tsx              # React SPAエントリ
-│   ├── api/                  # /api/* クライアント（今後実装）
-│   ├── components/           # 共通UI（今後実装）
-│   └── pages/                # 画面（今後実装）
+│   ├── main.tsx               # React SPAエントリ（AuthGuard → AppShell）
+│   ├── styles/theme.css       # デザイン要件のカラーパレット・共通クラス
+│   ├── api/auth.ts            # /api/auth/* クライアントと AuthApiError
+│   ├── components/            # auth-guard.tsx（認証シェル）/ app-shell.tsx（共通枠・メニュー）
+│   └── pages/login-page.tsx   # ログイン画面
 └── worker/
-    ├── index.ts              # Basic認証 → Hono → ASSETS.fetch
-    ├── index.test.ts         # Workerスモークテスト
-    ├── db/schema.ts          # Drizzleの10テーブル定義
-    ├── routes/               # APIルート（今後実装）
-    ├── services/             # 業務ロジック（今後実装）
-    └── types/                # SPA/Worker共有型（今後実装）
+    ├── index.ts               # Basic認証 → Hono → ASSETS.fetch
+    ├── db/schema.ts           # Drizzleの10テーブル定義
+    ├── routes/                # APIルート
+    ├── services/              # 業務ロジック
+    └── types/                 # SPA/Worker共有型
+test/                          # src/ と同じディレクトリ構成をミラーする（AGENTS.md）
+├── react-app/
+│   ├── test-setup.ts          # Testing Library の cleanup 登録
+│   ├── api/auth.test.ts
+│   ├── components/            # auth-guard.test.tsx / app-shell.test.tsx
+│   └── pages/login-page.test.tsx
+└── worker/
+    ├── index.test.ts          # Workerスモークテスト
+    ├── db/                    # repositories・seed・tenant-context 等
+    ├── routes/auth.test.ts
+    └── services/auth.test.ts
 drizzle/
 ├── 0000_small_red_skull.sql  # 初回D1マイグレーション
 └── meta/                     # Drizzleスキーマスナップショット（追跡対象）
@@ -96,7 +115,7 @@ Biomeは `src/**`、ルートの `*.ts` / `*.json`、`index.html` を対象に�
 |---|---|---|
 | SPA entry | `src/react-app/main.tsx` | React SPAをマウント |
 | Worker entry | `src/worker/index.ts` | Basic認証を通し、未処理リクエストをASSETSへ委譲 |
-| Worker tests | `src/worker/index.test.ts` | Basic認証と静的アセット委譲を検証 |
+| Worker tests | `test/worker/index.test.ts` | Basic認証と静的アセット委譲を検証 |
 | DB schema | `src/worker/db/schema.ts` | D1の10テーブル、外部キー、制約、インデックス |
 | Drizzle config | `drizzle.config.ts` | SQLite向けマイグレーション生成 |
 | Wrangler config | `wrangler.toml` | Worker、Static Assets、D1、R2バインディング |
@@ -132,6 +151,7 @@ Biomeは `src/**`、ルートの `*.ts` / `*.json`、`index.html` を対象に�
 
 ## Current Development State
 
-- スキャフォールド、Basic認証、10テーブルのDrizzleスキーマ、初回マイグレーションは実装・検証・push済み。
-- 次の機能はアプリ内認証（ログイン／ログアウト、D1セッション、admin/staff認可、シード職員）。
-- 詳細な要件は `knowledge/wiki/requirements/functional.md` のF-1、セキュリティ要件、`knowledge/wiki/architecture/api.md` を読む。
+- Task 001〜004 まで完了（共有型・設定・テナント境界／リポジトリとシード／アプリ内認証とロール認可／SPA認証シェルとログイン画面）。
+- SPAはログインと認証済みの共通枠までが動く。**ルーターは未導入**で、メニュー項目は遷移先が無いため `disabled` のボタン。各画面の中身は後続タスク。
+- 次に着手できるのは Task 005（利用量上限）、012（スタッフ管理）、014（デモデータ初期化）。
+- 詳細な要件は `knowledge/wiki/requirements/functional.md`、`knowledge/wiki/screens/screen-list.md`、`knowledge/wiki/architecture/api.md` を読む。

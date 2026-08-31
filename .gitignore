@@ -69,6 +69,11 @@ web_modules/
 .env
 .env.*
 
+# Wrangler のローカル用シークレット。README と非機能要件の環境変数一覧に従って
+# 開発者が各自で作成する。Workers Secret 相当の値が入るためコミットしない。
+.dev.vars
+.dev.vars.*
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

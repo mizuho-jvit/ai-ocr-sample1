@@ -3,11 +3,19 @@ import type {
   AppConfig,
   ScopedDb,
   SqlExpr,
+  StaffUserId,
   TenantId,
   TenantRow,
   TenantScopedTable,
 } from "../types";
-import { createScopedDatabase, tenantIds, whereEquals } from "./client";
+import {
+  clearExpiredLoginLock,
+  createScopedDatabase,
+  type LoginFailureState,
+  registerLoginFailure,
+  tenantIds,
+  whereEquals,
+} from "./client";
 import type {
   applications,
   appStatusHistory,
@@ -30,6 +38,31 @@ export interface TableRepository<
   insert(values: WithoutTenant<Insert>): Promise<Row>;
   update(values: Partial<WithoutTenant<Row>>, where: SqlExpr): Promise<number>;
   delete(where: SqlExpr): Promise<number>;
+}
+
+/**
+ * `TableRepository` の値ベースの更新では表現できない、原子的な失敗計上だけを追加する。
+ * `tenantId` は `forTenant` から供給され、呼び出し側は渡さない（NF-5-1）。
+ */
+export interface StaffUserRepository
+  extends TableRepository<
+    typeof staffUsers.$inferSelect,
+    typeof staffUsers.$inferInsert
+  > {
+  clearExpiredLoginLock(
+    staffUserId: StaffUserId,
+    expiredLockedUntil: string,
+  ): Promise<void>;
+  registerLoginFailure(
+    staffUserId: StaffUserId,
+    input: { lockThreshold: number; lockedUntil: string },
+  ): Promise<LoginFailureState | null>;
+}
+
+interface RepositoryContext {
+  readonly database: D1Database;
+  readonly tenantId: TenantId;
+  readonly trace?: OperationTrace;
 }
 
 export interface TenantScopedRepositories {
@@ -57,10 +90,7 @@ export interface TenantScopedRepositories {
     typeof sessions.$inferSelect,
     typeof sessions.$inferInsert
   >;
-  readonly staffUsers: TableRepository<
-    typeof staffUsers.$inferSelect,
-    typeof staffUsers.$inferInsert
-  >;
+  readonly staffUsers: StaffUserRepository;
   readonly statusHistory: TableRepository<
     typeof statusHistory.$inferSelect,
     typeof statusHistory.$inferInsert
@@ -100,8 +130,43 @@ function tableRepository<Row extends TenantRow, Insert extends TenantRow>(
   });
 }
 
+function staffUserRepository(
+  scopedDatabase: ScopedDb,
+  context: RepositoryContext,
+): StaffUserRepository {
+  return Object.freeze({
+    ...tableRepository<
+      typeof staffUsers.$inferSelect,
+      typeof staffUsers.$inferInsert
+    >(scopedDatabase, "staff_users"),
+    clearExpiredLoginLock: (
+      staffUserId: StaffUserId,
+      expiredLockedUntil: string,
+    ) =>
+      clearExpiredLoginLock(
+        context.database,
+        context.tenantId,
+        staffUserId,
+        expiredLockedUntil,
+        context.trace,
+      ),
+    registerLoginFailure: (
+      staffUserId: StaffUserId,
+      input: { lockThreshold: number; lockedUntil: string },
+    ) =>
+      registerLoginFailure(
+        context.database,
+        context.tenantId,
+        staffUserId,
+        input,
+        context.trace,
+      ),
+  });
+}
+
 function scopedRepositories(
   scopedDatabase: ScopedDb,
+  context: RepositoryContext,
 ): TenantScopedRepositories {
   return Object.freeze({
     applications: tableRepository<
@@ -128,10 +193,7 @@ function scopedRepositories(
       typeof sessions.$inferSelect,
       typeof sessions.$inferInsert
     >(scopedDatabase, "sessions"),
-    staffUsers: tableRepository<
-      typeof staffUsers.$inferSelect,
-      typeof staffUsers.$inferInsert
-    >(scopedDatabase, "staff_users"),
+    staffUsers: staffUserRepository(scopedDatabase, context),
     statusHistory: tableRepository<
       typeof statusHistory.$inferSelect,
       typeof statusHistory.$inferInsert
@@ -146,7 +208,11 @@ export function createTenantRepository(
 ): TenantRepository {
   return Object.freeze({
     forTenant: (tenantId: TenantId) =>
-      scopedRepositories(createScopedDatabase(database, tenantId, trace)),
+      scopedRepositories(createScopedDatabase(database, tenantId, trace), {
+        database,
+        tenantId,
+        trace,
+      }),
   });
 }
 

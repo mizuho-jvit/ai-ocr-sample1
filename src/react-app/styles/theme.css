@@ -1,0 +1,222 @@
+/*
+ * デザイン正典: knowledge/wiki/requirements/overview.md の「デザイン要件」。
+ * 配色・書体はプロトタイプ `knowledge/ref/doc/ai-ocr-demo.jsx` 冒頭の定数群をそのまま踏襲する。
+ */
+:root {
+  --ink: #1c2233;
+  --ink-soft: #4a5265;
+  --paper: #f6f5f0;
+  --card: #ffffff;
+  --rule: #d8d4c8;
+  --vermilion: #be3b2b;
+  --amber-bg: #fbf3dc;
+  --amber-border: #c99a2e;
+  --ok-green: #2e6e4e;
+  --ok-green-bg: #eaf3ee;
+  --err-bg: #fbe9e7;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.serif {
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+}
+
+.goth {
+  font-family:
+    "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", Meiryo, sans-serif;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+
+.field-group {
+  margin-bottom: 14px;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.field-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  background: #fdfdfb;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  outline: none;
+}
+.field-input:hover {
+  border-color: #a9a492;
+}
+.field-input:focus {
+  background: #fff;
+  border-color: var(--vermilion);
+  box-shadow: 0 0 0 2px rgba(190, 59, 43, 0.12);
+}
+.field-input::placeholder {
+  color: #b9b5a9;
+}
+
+.btn {
+  padding: 12px 20px;
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  transition: opacity 0.15s;
+}
+.btn:hover {
+  opacity: 0.85;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--vermilion);
+  outline-offset: 2px;
+}
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.btn-primary {
+  color: #fff;
+  background: var(--ink);
+}
+
+.btn-ghost {
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid var(--rule);
+}
+
+.btn-small {
+  padding: 3px 10px;
+  font-size: 11px;
+  border-radius: 6px;
+}
+
+.alert {
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.7;
+  background: var(--err-bg);
+  border: 1px solid var(--vermilion);
+  border-radius: 6px;
+}
+
+.status-message {
+  padding: 48px 24px;
+  font-size: 14px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.login-page {
+  min-height: 100vh;
+  background: var(--paper);
+}
+
+.login-container {
+  max-width: 420px;
+  margin: 8vh auto 0;
+  padding: 24px 16px;
+}
+
+.login-header {
+  padding-bottom: 14px;
+  margin-bottom: 24px;
+  text-align: center;
+  border-bottom: 3px double var(--ink);
+}
+
+.login-subtitle {
+  margin: 6px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--ink-soft);
+}
+
+.app-shell {
+  max-width: 800px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  margin-bottom: 16px;
+  border-bottom: 3px double var(--ink);
+}
+
+.app-user {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 0;
+  margin: 0 0 20px;
+  list-style: none;
+  border-bottom: 1px solid var(--rule);
+}
+
+.app-nav-item {
+  padding: 10px 4px;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+.app-nav-item:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.app-footer {
+  padding-top: 16px;
+  margin-top: 32px;
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--ink-soft);
+  border-top: 1px solid var(--rule);
+}
+
+.app-footer ul {
+  padding-left: 20px;
+  margin: 0;
+}

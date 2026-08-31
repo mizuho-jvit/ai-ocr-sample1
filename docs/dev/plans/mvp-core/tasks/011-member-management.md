@@ -34,4 +34,4 @@ function changeMemberStatus(id: string, input: ChangeMemberStatusRequest, actor:
 ## Files
 
 - 新規: `src/worker/routes/members.ts`, `src/react-app/{api/members.ts,pages/member-*.tsx}`
-- テスト: `src/worker/routes/members.test.ts`
+- テスト: `test/worker/routes/members.test.ts`

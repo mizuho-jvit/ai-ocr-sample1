@@ -4,6 +4,59 @@
 
 ## 2026-08-31
 
+### テストファイルをモジュール本体から分離し `test/` へ集約した
+
+- これまで `*.test.ts` / `*.test.tsx` はモジュールと同じディレクトリに置いていた（例: `src/worker/services/auth.ts` と `src/worker/services/auth.test.ts` が同居）。ユーザーの指示により `test/` ディレクトリへ分離し、`src/` と同じ構成をミラーする形にした（`src/worker/services/auth.test.ts` → `test/worker/services/auth.test.ts`）。`AGENTS.md` はもともと「`test/`（またはモジュールの隣）」と両論併記していたが、今回で `test/` へ一本化した。
+- **確認した事実として、ビルド成果物への混入はこれまでも起きていなかった。** `vite build` はエントリポイント（SPA: `index.html → main.tsx`、Worker: `wrangler.toml` の `main`）から辿れるimportグラフだけをバンドルし、テストファイルはどちらのグラフにも乗らない。実際に `dist/` を検査し、`describe(` や `vitest` の文字列が含まれないことを確認済み。今回の移動は見通しのためであり、公開境界のリスク対応ではない。
+- 対象は Worker 13ファイル・SPA 4ファイル・`test-setup.ts` の計18ファイル。相対importは移動先から本体・フィクスチャへ正しく再解決されるよう機械的に再計算し、`tsc -b` と `vitest run`（17ファイル・119テスト）が移動前と同じ結果になることを確認した。
+- 追随して更新: `vitest.config.ts`（`include` / `setupFiles`）、`tsconfig.app.json` / `tsconfig.worker.json`（`test/` を `include` に追加）、`biome.json`（`test/**` を対象に追加）、`AGENTS.md`、`docs/dev/context.md`、`README.md`、`CLAUDE.md`、未着手タスク（005〜015, 018）の `テスト:` 行。
+
+### ログイン画面・認証シェルの見た目をデザイン要件に合わせた
+
+- Task 004 のログイン画面・認証シェル（読み込み中・エラー表示）・共通枠は、これまで装飾のないセマンティックHTMLのみだった。[デザイン要件](./requirements/overview.md#デザイン要件)（プロトタイプ `ai-ocr-demo.jsx` 冒頭のカラーパレット踏襲）に合わせ、配色・明朝体見出し・カード/罫線のスタイルを適用した。
+- `src/react-app/styles/theme.css` を新設し、`main.tsx` から読み込む形にした。デモの `<style>` タグと同じ考え方で、色はCSSカスタムプロパティ、共通パーツ（`.field-input` `.btn` 等）はクラスとして切り出した。判子スタンプ等デモ固有の演出（読取結果画面など）は後続タスクの対象であり、今回は未実装。
+- `tsconfig.app.json` に `"types": ["vite/client"]` を追加した。`noUncheckedSideEffectImports` が有効なため、`*.css` の副作用importに型宣言が必要だった。
+- **入力欄・ボタンすべてに固定の `id` を付与した。** これまでメール/パスワード欄は `useId()` の自動採番IDだったが、E2Eテスト（Task 016）等での参照を安定させるため `login-email` `login-password` `login-submit` のような意味のある文字列へ変更した。ログアウト・再試行・ナビゲーション項目にも同様に付与した（`logout-button` `logout-retry-button` `session-retry-button` `nav-home` 等）。
+- 既存の `role`/ラベルテキストに基づくテスト（`getByRole` `getByLabelText`）は変更していないため、Task 004 のテスト19件はそのまま通る。`corepack pnpm lint` / `test`（17ファイル・119テスト）/ `build` で確認した。
+
+### SPA認証シェルとログイン画面を実装した（Task 004）
+
+- `src/react-app/api/auth.ts`（`/api/auth/*` クライアント）、`components/auth-guard.tsx`（起動時のセッション確認と未認証時の誘導）、`components/app-shell.tsx`（認証済みの共通枠とメニュー出し分け）、`pages/login-page.tsx` を追加し、`main.tsx` を `AuthGuard → AppShell` に差し替えた。
+- **401が3種類あることを踏まえ、分岐はHTTPステータスではなく `code` で行う。** Basic認証のチャレンジ（非JSON・`WWW-Authenticate: Basic`）、セッション切れ（`UNAUTHENTICATED`）、資格情報の誤り（`INVALID_CREDENTIALS`）が同じ401に同居する。応答本文がパースできない401を未認証と解釈すると、Cookieを得られないままログイン画面で再試行を繰り返す。
+- **`UNAUTHENTICATED` 以外の失敗はログイン画面へ落とさず、再試行できるエラー表示にした。** 落とすとバックエンド障害が「ログインしても戻される」ループに化け、原因が読めなくなる。
+- セッションはHTTPOnly Cookieのため、認証状態の唯一の情報源は `GET /api/auth/session` の結果。`localStorage` / `sessionStorage` は使わない。ログイン応答は `features` を含まないため、成功後に `session()` を引き直す。
+- メニューの出し分け（admin専用のスタッフ管理・デモデータ初期化、`ALLOW_DATA_RESET` 未設定時の非表示）は[画面一覧](./screens/screen-list.md)に従う。**F-9-8 のとおり表示上の配慮であり、APIのロール認可を代替しない。** 画面上に常時表示する3つの注記も共通枠へ入れた。
+- **テスト実行基盤を分割した。** `cloudflareTest()` を全テストへ一律適用していたためSPAのテストもworkerd上で動き、DOMが無く描画テストが書けなかった。`vitest.config.ts` を `test.projects` で `worker`（workerdプール）と `react-app`（`happy-dom` + `@testing-library/react`）に分け、`include` をディレクトリで完全に分離した。**実装レベルの判断のため [判断記録](./requirements/decisions.md) には追加していない**（同ページは要件確定の記録）。詳細は `docs/dev/context.md` の Test Framework。
+- SPAはWorkerの実行時コードをimportせず、型のみ `src/worker/types/contracts.ts` から共有する。
+- `corepack pnpm lint` / `test`（17ファイル・116テスト、新規21件）/ `build` で確認した。**4つのテストファイルが実装前に失敗することを確認してから実装している。**
+- **ルーターは未導入。** メニュー項目は遷移先が無いため `disabled` のボタンとして描画している。
+
+### Task 004 のコードレビュー指摘2件を修正した
+
+- **ログアウト失敗時に未認証へ遷移していた欠陥を修正した（中）。** `AuthGuard` が `finally` で無条件に未認証へ移し、`AppShell` はその例外を捨てていた。通信障害や500ではサーバー側のセッションが残っている可能性があるため、**画面だけログアウト済みになると「ログアウトしたつもりで有効なまま」という取り違えが起きる。** 成功時だけ未認証へ移し、失敗時は認証済みのまま「ログアウトできませんでした。」と再試行を表示する形へ変えた。**修正前のコードで新規2テストが落ちることを確認済み。**
+- **常時表示注記の文面を正典どおりに戻した（低）。** [画面一覧](./screens/screen-list.md#画面上に常時表示する注記)の「最終判断は必ず職員が行う」等を敬体へ言い換えていた。営業文言は「失わないこと」と指定されているため、一字一句そろえた。
+  - **あわせて、レビューが提案した「定数との完全一致で照合する」だけでは乖離を検出できないことが分かった。** 描画元と同じ定数を期待値に使うため照合が循環し、定数そのものが正典から離れても通ってしまう（実際に定数を敬体へ戻しても落ちなかった）。`screen-list.md?raw` を読んで本文と突き合わせるテストを追加した。Task 002 の `seed.test.ts` が README のデモ資格情報を突き合わせているのと同じ方式で、テスト専用のためSPAのバンドルには入らない。定数を敬体へ戻すと落ちることを確認済み。
+- `corepack pnpm lint` / `test`（17ファイル・119テスト）/ `build` で確認した。
+
+### アプリ内認証・D1セッション・ロール認可を実装した（Task 003）
+
+- `src/worker/services/auth.ts`（PBKDF2・ロック・セッション）、`src/worker/middleware/auth.ts`（`requireSession` / `requireAdmin`）、`src/worker/routes/auth.ts`（`/api/auth/login` `logout` `session`）を追加し、`src/worker/index.ts` から Basic認証の後段に接続した。
+- パスワードは NF-2-2 の自己記述形式 `pbkdf2-sha256$<iterations>$<salt>$<hash>` で保存し、検証は**保存された反復回数**で行う（NF-2-3）。ログイン成功時に保存値が `PBKDF2_ITERATIONS` を下回っていれば作り直す（NF-2-9）。ハッシュ比較は定数時間で行う。
+- 実装で確定した設計判断3件を [APIエンドポイント仕様の設計判断](./architecture/api.md#設計判断要件に明記がない箇所) #9〜#11 へ追記した。**セッション有効期間12時間**、**無効化された職員の既存セッションを失効させる**、**ログインは成否によらず常に1回だけ鍵導出を行う**（F-1-7 の秘匿を応答時間でも守るため）。
+- Task 002 が README のデモ資格情報とシードのハッシュを突き合わせていたテストは、PBKDF2 を独自に再実装していた。本番の `verifyPassword` を使う形へ置き換え、並行実装が乖離しないようにした。デモ用 `admin@example.com` / `staff@example.com` のシードハッシュが `demo1234` と一致することを実測で確認済み。
+- `corepack pnpm lint` / `test`（13ファイル・87テスト、新規41件）/ `build` で確認した。
+- **PBKDF2 のCPU時間（NF-2-7・10ms/リクエスト制約）は未実測。** `wrangler dev` では制限が適用されないため、Task 016 で `dev:remote` または本番デプロイ後に実測する。
+
+### Task 003 のコードレビュー指摘3件を修正した
+
+- **並行ログインでロックを回避できる欠陥を修正した（高）。** `services/auth.ts` の失敗回数の計上が read-modify-write だったため、同時リクエストが同じ値を読んで同じ値を書いていた。**実測では5本同時に送ると回数が1にしかならず、F-1-6 のロックはほぼ完全に回避可能だった**（読み取りと書き込みの間に PBKDF2 が入るため競合窓が広い）。加算とロック判定を単一の UPDATE（`SET failed_login_count = failed_login_count + 1` と `CASE`）へ移した。`UsageCounter` について NF-2-39 が定めているのと同じ規律を認証カウンタにも適用した形。
+  - `client.ts` に `registerLoginFailure` / `clearExpiredLoginLock` を追加し、`repositories.ts` の `staffUsers` へ生やした。`tenantId` は従来どおり `forTenant` からのみ供給され、`ScopedDb` の汎用インターフェース（[共有型 §9](./architecture/types.md)）は変更していない。
+  - ロック満了時の解除は「読み取った値と完全一致するときだけ」に限定した（compare-and-swap）。無条件に解除すると、直前に別リクエストが張ったロックを消す別の回避経路が開く。
+- **`PBKDF2_ITERATIONS` の上限を設定読込でも検証するようにした（高）。** 保存済みハッシュのパース側は1,000,000回を上限としていたが、設定側は下限のみ検証していた。そのため上限超の値では**生成できるが検証は必ず失敗するハッシュ**が作られ、次回ログインで確実に認証失敗していた。上限を `load-config.ts` へ一元化し、超過時は起動失敗させる。[非機能要件の環境変数一覧](./requirements/non-functional.md#環境変数の一覧統合)へ注記した。
+- **業務APIの認証漏れを構造的に防ぐため、公開ルーターと保護ルーターを分離した（中）。** 認証不要なのは `POST /api/auth/login` だけとし、それ以外は `sessionGuard()` を根に適用した保護ルーター配下へ置いた。今後の業務APIはそこへ足すため、付け忘れが起きない。あわせて `app.routes` を全列挙し、許可リスト外の `/api` ルートがセッション無しで401を返すことを検証するテストを追加した。**無防備なルートを故意に追加してテストが落ちることを確認済み。**
+- **api.md の設計判断 #11 の記述を実態に合わせて訂正した。** 「存在秘匿を応答時間でも守る」は過剰主張だった。反復回数の移行中は、旧回数のまま残るアカウント（NF-2-9 の再ハッシュは初回ログイン成功時にのみ起きる）の応答時間が他と異なり得る。保証する範囲・しない範囲と、一次的な防御が応答本文・ステータスの同一性であることを[注記](./architecture/api.md#設計判断要件に明記がない箇所)した。
+- `corepack pnpm lint` / `test`（13ファイル・94テスト）/ `build` で確認した。**指摘1・3のテストはいずれも修正前のコードで落ちることを確認してから修正を適用している。**
+
 ### ID にブランド型（nominal typing）を導入する判断へ変更した
 
 - Task 002（`src/worker/db/{client,repositories,seed}.ts`）のコードレビューで、`repositories.ts` がテナントスコープの `TenantRow` 型を正典（`../types`）から import せずローカルで再定義していた点を指摘した。指摘自体は軽微だったが、説明のために「`TenantId` が将来ブランド型化されたら重複定義が乖離しうる」という仮定の例を出したところ、**それなら実際にブランド型化しよう**という判断になった。

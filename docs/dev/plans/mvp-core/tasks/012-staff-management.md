@@ -32,4 +32,4 @@ type CreateStaffRequest = { name: string; email: string; password: string; role:
 ## Files
 
 - 新規: `src/worker/routes/staff.ts`, `src/react-app/{api/staff.ts,pages/staff-page.tsx}`
-- テスト: `src/worker/routes/staff.test.ts`
+- テスト: `test/worker/routes/staff.test.ts`

@@ -16,7 +16,14 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["vite/client"]
   },
-  "include": ["src/react-app"]
+  // `?raw` の型宣言は Worker 側と共有する（重複定義を作らないため）。
+  // テストは `test/react-app` に分離している（AGENTS.md のテスト配置規約）。
+  "include": [
+    "src/react-app",
+    "test/react-app",
+    "src/worker/types/raw-imports.d.ts"
+  ]
 }

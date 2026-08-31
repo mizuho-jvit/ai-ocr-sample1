@@ -33,4 +33,4 @@ interface UsageService { consumeOcr(): Promise<UsageResponse>; consumeGemini(): 
 ## Files
 
 - 新規: `src/worker/{services/usage.ts,routes/usage.ts}`
-- テスト: `src/worker/services/usage.test.ts`
+- テスト: `test/worker/services/usage.test.ts`

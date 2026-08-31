@@ -33,4 +33,4 @@ async function runBusinessCheck(actor: SessionActor, applicationId: string): Pro
 ## Files
 
 - 新規: `src/worker/{services/business-check.ts,routes/checks.ts}`
-- テスト: `src/worker/{services/business-check,routes/checks}.test.ts`
+- テスト: `test/worker/{services/business-check,routes/checks}.test.ts`

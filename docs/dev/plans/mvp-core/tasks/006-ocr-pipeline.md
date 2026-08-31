@@ -33,4 +33,4 @@ interface BusinessCheckPipeline { run(input: CheckInput): Promise<CheckResult>; 
 ## Files
 
 - 新規: `src/worker/services/{ocr-pipeline,gemini-client}.ts`
-- テスト: `src/worker/services/*pipeline*.test.ts`
+- テスト: `test/worker/services/*pipeline*.test.ts`

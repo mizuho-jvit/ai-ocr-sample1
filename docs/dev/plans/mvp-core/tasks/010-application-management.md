@@ -34,4 +34,4 @@ function decideMatch(id: string, candidateId: string, input: DecideMatchRequest)
 ## Files
 
 - 新規: `src/worker/routes/applications.ts`, `src/react-app/{api/applications.ts,pages/application-*.tsx}`
-- テスト: `src/worker/routes/applications.test.ts`, `src/react-app/**/*.test.tsx`
+- テスト: `test/worker/routes/applications.test.ts`, `test/react-app/**/*.test.tsx`

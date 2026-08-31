@@ -40,4 +40,4 @@ function forTenant(tenantId: string, executor: TenantScopedExecutor): ScopedDb; 
 
 - 新規: `src/worker/{types,config,db}/**`
 - 変更: `src/worker/index.ts`, `worker-configuration.d.ts`, `.env.example`
-- テスト: `src/worker/{config,db}/*.test.ts`
+- テスト: `test/worker/{config,db}/*.test.ts`

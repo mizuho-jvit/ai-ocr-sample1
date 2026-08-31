@@ -3,7 +3,6 @@ import type { D1Migration } from "@cloudflare/vitest-pool-workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import readme from "../../../README.md?raw";
 import demoSeedSql from "../../../scripts/db/seed.sql?raw";
-import type { AppConfig } from "../types";
 import {
   DEMO_MEMBER_IDS,
   DEMO_MEMBERS,
@@ -12,7 +11,9 @@ import {
   DEMO_TENANT,
   DEMO_TENANT_ID,
   seedDemoData,
-} from "./seed";
+} from "../../../src/worker/db/seed";
+import { verifyPassword } from "../../../src/worker/services/auth";
+import type { AppConfig } from "../../../src/worker/types";
 
 const CONFIG: AppConfig = {
   allowDataReset: true,
@@ -131,9 +132,13 @@ describe("seedDemoData", () => {
         (entry) => entry.email === staff.email && entry.role === staff.role,
       );
       expect(credential).toBeDefined();
+      // 本番の検証経路そのもので照合する（並行実装で取り違えないため）。
       await expect(
-        matchesPassword(credential?.password ?? "", staff.passwordHash),
+        verifyPassword(credential?.password ?? "", staff.passwordHash),
       ).resolves.toBe(true);
+      await expect(
+        verifyPassword("wrong-password", staff.passwordHash),
+      ).resolves.toBe(false);
     }
   });
 });
@@ -150,51 +155,4 @@ function documentedCredentials(
     }
     return [{ email: match[2], password: match[3], role: match[1] }];
   });
-}
-
-async function matchesPassword(
-  password: string,
-  storedHash: string,
-): Promise<boolean> {
-  const [algorithm, iterationsText, saltBase64, hashBase64] =
-    storedHash.split("$");
-  if (
-    algorithm !== "pbkdf2-sha256" ||
-    !iterationsText ||
-    !saltBase64 ||
-    !hashBase64
-  ) {
-    return false;
-  }
-  if (decodeBase64(saltBase64).byteLength < 16) {
-    return false;
-  }
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const expectedHash = decodeBase64(hashBase64);
-  const derived = await crypto.subtle.deriveBits(
-    {
-      hash: "SHA-256",
-      iterations: Number(iterationsText),
-      name: "PBKDF2",
-      salt: decodeBase64(saltBase64),
-    },
-    key,
-    expectedHash.byteLength * 8,
-  );
-  return encodeBase64(new Uint8Array(derived)) === hashBase64;
-}
-
-function decodeBase64(value: string): Uint8Array<ArrayBuffer> {
-  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
-}
-
-function encodeBase64(value: Uint8Array): string {
-  return btoa(String.fromCharCode(...value));
 }

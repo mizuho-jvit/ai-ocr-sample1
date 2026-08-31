@@ -34,4 +34,4 @@ function findMatchCandidates(scope: TenantScope, input: NormalizedMemberIdentity
 ## Files
 
 - 新規: `src/worker/services/{member-normalizer,matching}.ts`, `src/worker/assets/variant-map.json`
-- テスト: `src/worker/services/{member-normalizer,matching}.test.ts`
+- テスト: `test/worker/services/{member-normalizer,matching}.test.ts`

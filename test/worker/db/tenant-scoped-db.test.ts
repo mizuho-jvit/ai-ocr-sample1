@@ -1,16 +1,16 @@
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import {
+  createForTenant,
+  forTenant,
+  type TenantScopedExecutor,
+} from "../../../src/worker/db/tenant-scoped-db";
+import {
   type SqlExpr,
   type TenantInsertValues,
   type TenantRow,
   type TenantUpdateValues,
   toTenantId,
-} from "../types";
-import {
-  createForTenant,
-  forTenant,
-  type TenantScopedExecutor,
-} from "./tenant-scoped-db";
+} from "../../../src/worker/types";
 
 interface TestRow extends TenantRow {
   id: string;

@@ -36,4 +36,4 @@ async function seedDemoData(db: D1Database, config: AppConfig): Promise<void>; /
 
 - 新規: `src/worker/db/{client,repositories,seed}.ts`
 - 変更: `package.json`, `README.md`
-- テスト: `src/worker/db/**/*.test.ts`
+- テスト: `test/worker/db/**/*.test.ts`

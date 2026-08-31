@@ -7,6 +7,14 @@ import {
 
 const MINIMUM_PASSWORD_LENGTH = 20;
 const MINIMUM_PRODUCTION_PBKDF2_ITERATIONS = 100_000;
+
+/**
+ * 反復回数の上限。保存済みハッシュのパース側（`services/auth.ts`）と同じ値を使い、
+ * 「生成できるが検証できないハッシュ」を作らないようにする。
+ * NF-2-8 の移行先（600,000回）に対して余裕があり、NF-2-7 の10ms制約からも
+ * これを超える設定値は現実的でない。改ざんされたDB値でCPU時間を消尽させない上限も兼ねる。
+ */
+export const MAX_PBKDF2_ITERATIONS = 1_000_000;
 const PIPELINE_MODES = new Set<OcrPipelineMode>([
   "gemini",
   "document-ai-gemini",
@@ -91,6 +99,13 @@ function validatePbkdf2Iterations(env: WorkerEnv, iterations: number): void {
     throw new ConfigValidationError(
       "PBKDF2_ITERATIONS",
       `must be at least ${MINIMUM_PRODUCTION_PBKDF2_ITERATIONS}`,
+    );
+  }
+  // 上限を超える設定は、検証できないハッシュを生成してしまうため起動を失敗させる。
+  if (iterations > MAX_PBKDF2_ITERATIONS) {
+    throw new ConfigValidationError(
+      "PBKDF2_ITERATIONS",
+      `must be at most ${MAX_PBKDF2_ITERATIONS}`,
     );
   }
 }

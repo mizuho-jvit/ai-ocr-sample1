@@ -33,5 +33,5 @@ function assertTenantIsolation(endpoint: EndpointDescriptor): Promise<void>; // 
 
 ## Files
 
-- 新規: `src/worker/**/*.integration.test.ts`, `src/worker/test/api-endpoints.ts`
+- 新規: `test/worker/**/*.integration.test.ts`, `test/worker/api-endpoints.ts`
 - 変更: `vitest.config.ts`

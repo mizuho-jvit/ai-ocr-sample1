@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { WorkerEnv } from "../types/env";
-import { loadConfig } from "./load-config";
+import {
+  loadConfig,
+  MAX_PBKDF2_ITERATIONS,
+} from "../../../src/worker/config/load-config";
+import type { WorkerEnv } from "../../../src/worker/types/env";
 
 function createValidEnv(overrides: Partial<WorkerEnv> = {}): WorkerEnv {
   return {
@@ -87,6 +90,24 @@ describe("loadConfig", () => {
         PBKDF2_ITERATIONS: "100000",
       }),
     ).not.toThrow();
+  });
+
+  it("rejects PBKDF2 iterations above the supported maximum", () => {
+    // 上限を超える設定は、生成できても検証できないハッシュを作ってしまうため
+    // 起動時に拒否する。services/auth.ts のパース側と同じ上限を共有している。
+    expect(() =>
+      loadConfig(
+        createValidEnv({ PBKDF2_ITERATIONS: String(MAX_PBKDF2_ITERATIONS) }),
+      ),
+    ).not.toThrow();
+
+    expect(() =>
+      loadConfig(
+        createValidEnv({
+          PBKDF2_ITERATIONS: String(MAX_PBKDF2_ITERATIONS + 1),
+        }),
+      ),
+    ).toThrowError("PBKDF2_ITERATIONS");
   });
 
   it("requires all Document AI settings only in document-ai-gemini mode", () => {

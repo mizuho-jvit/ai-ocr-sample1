@@ -2,16 +2,16 @@ import { applyD1Migrations, env } from "cloudflare:test";
 import type { D1Migration } from "@cloudflare/vitest-pool-workers";
 import { beforeAll, describe, expect, expectTypeOf, it } from "vitest";
 import {
+  createTenantRepository,
+  initializeTenantRepository,
+  whereFieldEquals,
+} from "../../../src/worker/db/repositories";
+import {
   type AppConfig,
   type MemberId,
   toMemberId,
   toTenantId,
-} from "../types";
-import {
-  createTenantRepository,
-  initializeTenantRepository,
-  whereFieldEquals,
-} from "./repositories";
+} from "../../../src/worker/types";
 
 const TENANT_A = toTenantId("tenant-a");
 const TENANT_B = toTenantId("tenant-b");
