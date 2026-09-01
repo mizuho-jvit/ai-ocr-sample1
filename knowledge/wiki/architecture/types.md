@@ -580,6 +580,7 @@ export interface Config {
   geminiModel: string;
   aiGatewayAccountId: string;
   aiGatewayId: string;
+  r2AccountId: string;
 }
 
 export declare function loadConfig(env: Env): Config;

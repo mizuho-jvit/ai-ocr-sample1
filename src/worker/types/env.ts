@@ -42,6 +42,7 @@ export interface AppConfig {
   geminiModel: string;
   aiGatewayAccountId: string;
   aiGatewayId: string;
+  r2AccountId: string;
 }
 
 export type Config = AppConfig;

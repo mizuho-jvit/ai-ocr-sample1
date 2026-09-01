@@ -131,7 +131,6 @@ export function loadConfig(env: WorkerEnv): AppConfig {
   validateSecrets(env);
   validateDocumentAiSettings(env, ocrPipelineMode);
   validateAiGatewaySettings(env);
-  requireSetting(env, "R2_ACCOUNT_ID");
 
   return {
     aiGatewayAccountId: requireSetting(env, "AI_GATEWAY_ACCOUNT_ID"),
@@ -149,6 +148,7 @@ export function loadConfig(env: WorkerEnv): AppConfig {
     maxOcrPagesPerMonth: requirePositiveInteger(env, "MAX_OCR_PAGES_PER_MONTH"),
     ocrPipelineMode,
     pbkdf2Iterations,
+    r2AccountId: requireSetting(env, "R2_ACCOUNT_ID"),
     tenantId: toTenantId(requireSetting(env, "TENANT_ID")),
   };
 }

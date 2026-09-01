@@ -2,6 +2,8 @@ import { useState } from "react";
 
 import type { Role, SessionResponse } from "../../worker/types/contracts";
 import { toErrorMessage } from "../api/auth";
+import { ocrApi } from "../api/ocr";
+import { OcrPage } from "../pages/ocr-page";
 import { useAuth } from "./auth-guard";
 
 interface NavItem {
@@ -158,8 +160,12 @@ export function AppShell() {
         </div>
       )}
       <AppNav session={session} />
-      <main className="card" style={{ marginBottom: 24, padding: 24 }}>
-        <p>各画面は後続タスクで実装します。</p>
+      {/*
+       * 🟡 Intent: ルーターは未導入のため、唯一実装済みの画面（帳票読取）を常時表示する。
+       * 他のメニュー項目は後続タスクで画面が揃うまで disabled のまま。
+       */}
+      <main style={{ marginBottom: 24 }}>
+        <OcrPage api={ocrApi} />
       </main>
       <footer className="app-footer">
         <ul>

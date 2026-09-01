@@ -139,7 +139,7 @@ class DocumentAiGeminiPipeline implements OcrPipeline {}
 
 ### 外部呼び出し
 
-**AI GatewayはBYOK構成のGoogle AI Studio互換エンドポイント（Universal Endpoint）を使用し、Workers AIバインディング（`env.AI`）は経由しない。** エンドポイントURLは `https://gateway.ai.cloudflare.com/v1/{AI_GATEWAY_ACCOUNT_ID}/{AI_GATEWAY_ID}/google-ai-studio/v1beta/models/{GEMINI_MODEL}:generateContent` の形で、`GEMINI_API_KEY` を `x-goog-api-key` ヘッダに、`cf-aig-collect-log-payload: false` をAI-7aのペイロードログ無効化ヘッダとして付与する（判断記録 #20）。
+**AI GatewayはBYOK構成のGoogle AI Studio互換エンドポイント（Universal Endpoint）を使用し、Workers AIバインディング（`env.AI`）は経由しない。** エンドポイントURLは `https://gateway.ai.cloudflare.com/v1/{AI_GATEWAY_ACCOUNT_ID}/{AI_GATEWAY_ID}/google-ai-studio/v1/models/{GEMINI_MODEL}:generateContent` の形で、`GEMINI_API_KEY` を `x-goog-api-key` ヘッダに、`cf-aig-collect-log-payload: false` をAI-7aのペイロードログ無効化ヘッダとして付与する（判断記録 #20）。
 
 **ID は正典化元の原本（要件定義書 v1.11 §8.3）に揃える。** 原本で重複している ID は枝番 `a` / `b` で区別する（[規約](#枝番-a--b-の規約と原本-83-の-id-重複)）。番号の欠番は、その項が本ページの散文にあることを意味する（[所在](#表に載せていない原本の-ai-x)）。
 

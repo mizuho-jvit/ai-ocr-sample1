@@ -152,8 +152,10 @@ Biomeは `src/**`、ルートの `*.ts` / `*.json`、`index.html` を対象に�
 ## Current Development State
 
 - Task 001〜006 まで完了(共有型・設定・テナント境界／リポジトリとシード／アプリ内認証とロール認可／SPA認証シェルとログイン画面／月次利用量制御／OCR PipelineとAI設定)。
-- SPAはログインと認証済みの共通枠までが動く。**ルーターは未導入**で、メニュー項目は遷移先が無いため `disabled` のボタン。各画面の中身は後続タスク。
-- `GET /api/usage` は実装済み(読み取り専用)。`OcrPipeline`(`createOcrPipeline` / `GeminiPipeline`)も実装済みだが、`POST /api/ocr/extract` はまだ無く、`consumeOcr` / `consumeGemini` を呼ぶ経路は配線されていない(Task 007がルート・R2・Usageの結線を担当)。
-- AI Gatewayの呼び出しには新設の `AI_GATEWAY_ACCOUNT_ID` / `AI_GATEWAY_ID` が必須(NF-2-46・判断記録 #20)。ローカルの `.dev.vars` に未設定なら追加すること。
-- 次に着手できるのは Task 007（OCR受付・原本画像管理・読取画面）。依存(003・004・006・017)はすべて完了済み。012（スタッフ管理）・014（デモデータリセット）も依存は満たすが優先度は低い。
+- **Task 007（OCR受付・原本画像管理・読取画面）はコード・テストが完了しているが、`status: pending` のまま。** R2の30日ライフサイクル削除(NF-3-1)がCloudflare側の手動設定(ダッシュボードまたは`wrangler r2 bucket lifecycle-rule add`)未実施のため、`done`にしていない。設定・確認後に`docs/dev/plans/mvp-core/tasks/007-ocr-intake-and-image-ui.md`の`status`を`done`へ変更すること。
+- SPAはログインと認証済みの共通枠までが動く。**ルーターは未導入**で、メニュー項目は遷移先が無いため `disabled` のボタン。`OcrPage`(`src/react-app/pages/ocr-page.tsx`)は**`AppShell`の`<main>`に常時表示する形で配線済み**(ヘッダー・ナビ・注記フッターを画面から消さないため)。ルーター導入(Task 010)後は、複数画面をここへ切り替え表示する形に置き換える。
+- `POST /api/ocr/extract`・`GET /api/images/:applicationId`・`DELETE /api/applications/:id/image` が実装済み。`POST /api/ocr/extract`はocrPages・geminiCallsの両方を加算する(Pass①はGemini呼び出し回数の合算対象・NF-2-17)。`GET /api/images/:applicationId` は `createImageRoutes()`、`DELETE /api/applications/:id/image` は `createApplicationImageRoutes()`(`src/worker/routes/ocr.ts`)で、Task 010 が `/api/applications` の残りのCRUDを追加する際にこの1ルートを統合する必要がある。
+- 原本画像はR2 S3互換APIの署名付きURL(15分)で配信する(`src/worker/services/image-storage.ts`)。npm依存を追加できないためAWS SigV4をWebCryptoで自前実装している。バケット名(`ai-ocr-sample1-images`)はWorkerの`env`から読めないため定数として直書き(ユーザー判断。`wrangler.toml`の`bucket_name`と手動で同期させること)。
+- AI Gatewayの呼び出しには `AI_GATEWAY_ACCOUNT_ID` / `AI_GATEWAY_ID` が必須(NF-2-46・判断記録 #20)。ローカルの `.dev.vars` に未設定なら追加すること。
+- 次に着手できるのは Task 008（名寄せの正規化と候補抽出）または Task 010（申請管理と名寄せ判断画面。ルーター導入もここが自然な着地点）。依存はすべて完了済み(Task 007のR2ライフサイクル未設定はTask 015・016・018のみが依存関係として参照しており、008・010の着手は妨げない)。012（スタッフ管理）・014（デモデータリセット）も依存は満たすが優先度は低い。
 - 詳細な要件は `knowledge/wiki/requirements/functional.md`、`knowledge/wiki/screens/screen-list.md`、`knowledge/wiki/architecture/api.md` を読む。

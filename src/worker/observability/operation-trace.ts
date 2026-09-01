@@ -39,6 +39,8 @@ export type OperationName =
   | "config.load"
   | "tenant.initialize"
   | "gemini.generateStructured"
+  | "image.put"
+  | "image.delete"
   | `${DatabaseTable}.${DatabaseAction}`;
 
 export interface OperationMetadata {

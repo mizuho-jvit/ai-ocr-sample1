@@ -1,12 +1,15 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { getCookie } from "hono/cookie";
 
+import type { TenantRepository } from "../db/repositories";
 import type { OperationTrace } from "../observability/operation-trace";
 import type { AuthService, SessionActor } from "../services/auth";
+import type { ImageStorage } from "../services/image-storage";
 import type { UsageService } from "../services/usage";
 import {
   ApiErrorException,
   type AppConfig,
+  type OcrPipeline,
   toSessionId,
   type WorkerEnv,
 } from "../types";
@@ -20,6 +23,9 @@ export type AppHonoEnv = {
     actor?: SessionActor;
     auth: AuthService;
     config: AppConfig;
+    imageStorage: ImageStorage;
+    ocrPipeline: OcrPipeline;
+    repository: TenantRepository;
     trace: OperationTrace;
     usage: UsageService;
   };

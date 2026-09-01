@@ -12,6 +12,7 @@ import {
 import type {
   ApplicationId,
   CheckRunId,
+  ImageKey,
   MatchCandidateId,
   MemberId,
   PeriodKey,
@@ -141,7 +142,7 @@ export const applications = sqliteTable(
       .references(() => tenants.id),
     docType: text("doc_type").notNull(),
     fieldsJson: text("fields_json").notNull(),
-    imageKey: text("image_key"),
+    imageKey: text("image_key").$type<ImageKey>(),
     appStatus: text("app_status").notNull().default("received"),
     latestCheckRunId: text("latest_check_run_id")
       .$type<CheckRunId>()

@@ -4,6 +4,54 @@
 
 ## 2026-09-01
 
+### 読取結果画面にドロップゾーンが二重表示される不具合を修正した
+
+- 「読取結果画面に再度読取エリアがある」という指摘を受けた。ドロップゾーンが`stage`に関わらず常時表示されており、読取成功後も結果の上にもう一つ読取エリアが出ていた。`ai-ocr-demo.jsx`はアップロード画面（`phase === "home"`）と読取結果画面（`phase === "review"`）を排他表示しており、それに合わせていなかった実装漏れ。
+- `stage === "idle" || stage === "error"` のときだけドロップゾーンを表示するよう修正。処理中（resizing/uploading）は進捗メッセージのみ、成功時は結果画面のみを表示する。エラー時はその場で再試行できるようドロップゾーンを表示したままにする（`ai-ocr-demo.jsx`のcatch時に`phase("home")`へ戻す挙動と同じ）。
+- `corepack pnpm lint` / `test`（25ファイル・177テスト）/ `build` / `git diff --check` で確認した。
+
+### 読取結果確認画面をプロトタイプ準拠のテキストボックス編集に作り直した
+
+- 「読取後画面のデザインが違う。ラベル表示ではなくテキストボックスに表示して、読み違いを手動で直せるようにしてほしい」という指摘を受けた。`input/読取後画面デザイン.png`と`ai-ocr-demo.jsx`の`phase === "review"`セクションを正典として作り直した。
+- 値は`<dd>`ではなく`<input className="field-input">`で表示し、`onChange`でその場編集できるようにした（`updateField`）。確信度85%未満の項目は`ai-ocr-demo.jsx`と同じく黄色ハイライト＋左ボーダー＋「OK」ボタンで表示し、編集または「OK」クリックで確認済み扱いにしてハイライトを解除する（`confirmField`）。
+- **この「確認済み」状態はUIだけのローカル状態であり、サーバーへは保存しない。** `PATCH /api/applications/:id/fields`（項目編集の永続化API）はTask 010の範囲でまだ実装していないため、画面を離れると失われる。値の見た目上の編集はできるが、次にこの画面を開き直すとAIの生の読取結果に戻る。
+- 見出し「読取結果の確認 — {docType}（自動判別）」、読取時間、「✓ 申請データは「受付」として保存済みです」の確認行、確信度サマリのバナー（要確認項目があれば黄、なければ緑）、原本画像プレビュー（送信した縮小後画像をそのまま表示）を追加し、`ai-ocr-demo.jsx`のレイアウトに合わせた。
+- テスト方針の変更: jsdom（happy-dom）は`border: 1px solid var(--x)`のようなvar()を含むCSS shorthandの`getAttribute("style")`シリアライズが壊れる（実ブラウザでは起きない、テスト環境固有の問題）。行のハイライト有無をテストするために`data-needs-check`属性を追加し、インラインstyle文字列の中身を直接アサートするのをやめた。
+- `corepack pnpm lint` / `test`（25ファイル・175テスト）/ `build` / `git diff --check` で確認した。
+- **追記(同日)**: 当初「業務チェックへ進む」「中断する」ボタンは機能未実装を理由に省略したが、ユーザーの指示でデザイン一致のため追加した。「業務チェックへ進む」はユーザー指示どおり押しても何も行わない（F-3・Task 009実装時に配線）。「中断する」は`ai-ocr-demo.jsx`のresetScanと同じく画面をアップロード待ちへ戻す（申請は既に「受付」で保存済みのためデータは失われない）。`test`（25ファイル・177テスト）で確認。
+
+### OcrPageをAppShellへ配線し、プロトタイプのデザインに合わせた
+
+- ローカル動作確認で「ログイン後の画面からヘッダー・ナビ・注記フッターが消える」という指摘を受けた。原因は`OcrPage`が`AppShell`へ未配線で、確認用に`main.tsx`を一時的に`OcrPage`直描画へ差し替えていた際にAppShellの共通枠ごと表示されなくなっていたため。**`AppShell`の`<main>`へ`OcrPage`を常時表示する形で恒久的に配線した。** ルーターがまだ無いため、他のメニュー項目（申請状況一覧等）は従来どおり`disabled`のまま。
+- `OcrPage`のアップロード導線を`ai-ocr-demo.jsx`（`input/`・`knowledge/ref/doc/`）によりフィットさせた: 破線枠のドロップゾーン(`.ocr-dropzone`をtheme.cssへ追加)、見出し「帳票の画像を選択」（明朝体）、ボタン文言「画像を選ぶ・撮影する」。
+- **`capture="environment"`をファイル選択inputへ追加した。** F-2-1（カメラ撮影・ファイル選択・ドラッグ＆ドロップに対応）のうち、カメラ撮影の明示的なヒントが抜けていた実装漏れ。
+- `corepack pnpm lint` / `test`（25ファイル・174テスト）/ `build` / `git diff --check` で確認した。
+
+### コードレビュー指摘を反映した（Task 007）
+
+- **高: `POST /api/ocr/extract`がGemini呼び出し回数（`geminiCalls`）を消費していなかった。** `consumeOcr()`のみを呼び、`consumeGemini()`を呼んでいなかったため、`MAX_GEMINI_CALLS_PER_MONTH`がOCR経路（Pass①）で効かなかった（NF-2-17・NF-2-34違反）。`consumeOcr()` → `consumeGemini()`の順で両方を加算し、どちらかが上限到達なら以降（AI呼び出し・R2保存・D1保存）を実行しないよう修正した。Gemini上限到達時に`OcrPipeline.extract`・R2 `put`が呼ばれないことをテストで確認した（`test/worker/routes/ocr-extract.test.ts`）。**この経路ではGemini上限到達時もocrPagesは加算済みのまま戻らない**（NF-2-39の既知の限界どおり、fail closed側に倒す設計）。
+- **高: R2の30日ライフサイクル削除（NF-3-1）が未設定のまま`status: done`にしていた。** Cloudflare側の手動設定（ダッシュボードまたは`wrangler r2 bucket lifecycle-rule add`）が完了するまでは正確でないため、`docs/dev/plans/mvp-core/tasks/007-ocr-intake-and-image-ui.md`の`status`を`pending`へ戻した。コード・テストは完了しており、設定確認後にdoneへ変更する。
+- **中: ドラッグ＆ドロップで複数画像を落としても先頭の1枚だけを読み取っていた。** F-2-3（1申請=1画像）に反するため、`OcrPage`の`handleDrop`で`files.length > 1`を検知したら送信せず「1回につき1枚の画像のみ選択できます。」を表示するようにした。ファイル選択input側は`multiple`属性を付けていないためブラウザのダイアログ側で複数選択自体ができず、対象はD&Dのみ。
+- 補足指摘: OCR成功時の応答に含まれる`usage`（`UsageResponse`）を画面に反映していなかったため、読取結果表示に「今月の残り読取可能枚数」を追加した（`GET /api/usage`への再取得は不要という契約どおり）。
+- `OcrPage`が`AppShell`/`AppNav`へ未配線である点は既知の申し送り事項（Task 010でルーター導入時に接続予定）として変更していない。
+- `corepack pnpm lint` / `test`（25ファイル・174テスト、新規2件）/ `build` / `git diff --check` で確認した。
+
+### OCR受付・原本画像管理・読取画面を実装した（Task 007）
+
+- バックエンド: `src/worker/services/image-storage.ts`（R2への原本画像保存・削除・署名付きURL発行）、`src/worker/routes/ocr.ts`（`createOcrRoutes`: `POST /api/ocr/extract`、`createImageRoutes`: `GET /api/images/:applicationId`、`createApplicationImageRoutes`: `DELETE /api/applications/:id/image`）を追加した。フロントエンド: `src/react-app/api/ocr.ts`（`ocrApi` クライアントとF-2-2の縮小処理）、`src/react-app/pages/ocr-page.tsx`（アップロード〜進捗〜読取結果表示）を追加した。
+- **署名付きURLはR2のS3互換APIをAWS Signature V4で自前署名する。** サンドボックス環境ではnpmレジストリへ到達できず`aws4fetch`等のライブラリを追加できないため、WebCryptoのHMAC-SHA256で鍵導出・署名を手組みした（`buildSignedUrl`）。テストで実際に生成されたURLの構造（ホスト・クエリパラメータ・64桁16進の署名）を検証し、`test/worker/services/image-storage.test.ts`で確認済み。
+- **署名URL生成に必要なR2バケット名がenvから取得できないことに気づいた。** `wrangler.toml`の`[[r2_buckets]] bucket_name`はWorkerランタイムの`env`から読めず、既存の`R2_ACCOUNT_ID`はアカウントIDのみでバケット名を含まない。ユーザーに確認し、**新しい環境変数は追加せず、`image-storage.ts`内に定数として直書きする方針**を選んだ（バケット名を変更する場合は`wrangler.toml`と両方の書き換えが必要、とコード内に明記）。
+- `AppConfig`にこれまで検証はしていたが破棄していた`r2AccountId`を追加した（`load-config.ts`・`types/env.ts`・wiki `types.md`）。判断記録の追加は不要（`R2_ACCOUNT_ID`の用途はTask 017の判断記録 #18で既に確定済みのため、今回はそれを実際にAppConfigへ配線しただけ）。
+- 発行前に`{tenantId}/`プレフィックスを検証し、他テナントのオブジェクトには署名を発行しない（NF-5-19）。存在の開示を防ぐため403ではなく404にした（NF-5-16と同じ扱い）。
+- `POST /api/ocr/extract`の処理順序はデータフロー図どおり: Usage加算（AI呼び出し前・NF-2-39）→ `OcrPipeline.extract()` → R2保存 → D1へ`received`状態のApplicationを保存。途中で失敗すれば未完成のApplication行は作らない（4件のルートテストで確認: 422/429/503のいずれでもApplication行が0件のまま）。
+- `GET /api/images/:applicationId`（#14）・`DELETE /api/applications/:id/image`（#15）は`/api/applications`配下だが、**この1エンドポイントだけを`routes/ocr.ts`に置いた。** Task 010が`/api/applications`の残りのCRUD（一覧・詳細・項目編集・ステータス変更等）を追加する際、`index.ts`の`protectedApi.route("/applications", ...)`を統合する必要がある。
+- **R2の30日ライフサイクル削除（NF-3-1）は未設定のまま。** コードでは表現できないCloudflare側の設定（ダッシュボードまたは`wrangler r2 bucket lifecycle-rule add`）が必要で、Task 007のTest Strategyに記載があったが今回のスコープでは対応していない。ユーザーへの申し送り事項。
+- `processingSec`（Applicationスキーマの必須列）の計測範囲は前工程に指定がなく、Usage加算〜R2保存直前までの経過時間とした（🔴判断）。
+- フロントエンドは画面一覧の「ホーム（アップロード）」と「読取確認」を1画面にまとめ、確信度85%未満の項目をNF-4-3の閾値でハイライトした。**項目編集・「OK」ボタン・台帳表示は対象外**（Task 010の範囲）。ルーターが未導入のため、`OcrPage`は`AppShell`/`AppNav`へまだ配線していない（単体では画面遷移で到達不能）。
+- クライアント側リサイズ（F-2-2・長辺1568px・JPEG品質85%）はCanvas APIで実装したが、happy-domがCanvas 2D描画をサポートしないため実際の描画処理は自動テストで検証できない。縮小先サイズの計算だけを`computeResizedDimensions`という純関数に切り出し、そこだけを単体テストで確認した。実際の画質・サイズは`dev:remote`または実ブラウザでの確認が必要。
+- ログイン画面の慣習（固定id）に合わせ、ファイル選択inputに`id="ocr-file-input"`を付与した。
+- `corepack pnpm lint` / `test`（25ファイル・172テスト、新規27件）/ `build` / `git diff --check` で確認した。
+
 ### OCR PipelineとAI設定を実装した（Task 006）
 
 - `src/worker/services/gemini-client.ts`（Cloudflare AI Gateway経由でGeminiの`generateContent`を呼ぶ`GeminiClient`）、`src/worker/services/ocr-pipeline.ts`（`OcrPipeline`を実装する`GeminiPipeline`と、モードで実装を選ぶ`createOcrPipeline`）を追加した。

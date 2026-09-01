@@ -154,6 +154,7 @@ describe("loadConfig", () => {
       maxOcrPagesPerMonth: 120,
       ocrPipelineMode: "gemini",
       pbkdf2Iterations: 20_000,
+      r2AccountId: "r2-account",
       tenantId: "tenant-demo",
     });
     expect(JSON.stringify(config)).not.toContain(env.GEMINI_API_KEY);
