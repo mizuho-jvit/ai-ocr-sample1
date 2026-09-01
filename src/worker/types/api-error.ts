@@ -10,7 +10,8 @@ const ERROR_MESSAGES: Record<ErrorCode, string> = {
   INVALID_TRANSITION: "現在の状態ではこの操作を実行できません。",
   NOT_FOUND: "対象が見つかりません。",
   UNAUTHENTICATED: "ログインが必要です。",
-  USAGE_LIMIT_EXCEEDED: "今月の利用上限に達しました。",
+  USAGE_LIMIT_EXCEEDED:
+    "今月の利用上限に達しました。翌月まで待つか、上限値を引き上げて再デプロイする必要があります。",
   VALIDATION_ERROR: "入力内容を確認してください。",
 };
 

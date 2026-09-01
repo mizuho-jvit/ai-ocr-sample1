@@ -29,7 +29,7 @@ export type OperationStage =
   | "response.created"
   | "request.failed";
 
-type DatabaseTable = TenantScopedTable | "tenants";
+type DatabaseTable = TenantScopedTable | "tenants" | "usage_counter";
 type DatabaseAction = "select" | "selectOne" | "insert" | "update" | "delete";
 
 export type OperationName =

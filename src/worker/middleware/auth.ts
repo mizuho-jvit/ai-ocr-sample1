@@ -3,6 +3,7 @@ import { getCookie } from "hono/cookie";
 
 import type { OperationTrace } from "../observability/operation-trace";
 import type { AuthService, SessionActor } from "../services/auth";
+import type { UsageService } from "../services/usage";
 import {
   ApiErrorException,
   type AppConfig,
@@ -20,6 +21,7 @@ export type AppHonoEnv = {
     auth: AuthService;
     config: AppConfig;
     trace: OperationTrace;
+    usage: UsageService;
   };
 };
 

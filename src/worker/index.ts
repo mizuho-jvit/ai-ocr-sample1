@@ -21,7 +21,9 @@ import {
   createProtectedAuthRoutes,
   createPublicAuthRoutes,
 } from "./routes/auth";
+import { createUsageRoutes } from "./routes/usage";
 import { createAuthService } from "./services/auth";
+import { createUsageService } from "./services/usage";
 import {
   type AppConfig,
   apiErrorStatus,
@@ -88,6 +90,10 @@ export function createApp(
     context.set("config", config);
     context.set("trace", trace);
     context.set("auth", createAuthService({ config, repository }));
+    context.set(
+      "usage",
+      createUsageService({ config, database: env.DB, trace }),
+    );
     try {
       await executeOperation(
         trace,
@@ -125,6 +131,7 @@ export function createApp(
   const protectedApi = new Hono<AppHonoEnv>();
   protectedApi.use("*", sessionGuard());
   protectedApi.route("/auth", createProtectedAuthRoutes());
+  protectedApi.route("/usage", createUsageRoutes());
   // app.route はサブアプリのスナップショットを再生するため、搭載は登録の後に行う。
   app.route("/api", protectedApi);
 

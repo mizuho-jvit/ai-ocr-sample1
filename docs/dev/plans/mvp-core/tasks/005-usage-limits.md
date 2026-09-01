@@ -1,7 +1,7 @@
 ---
 id: "005"
 title: "月次利用量制御を実装"
-status: pending
+status: done
 priority: 1
 dependencies: ["001", "002"]
 estimated_complexity: high

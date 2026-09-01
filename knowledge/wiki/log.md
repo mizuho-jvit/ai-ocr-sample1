@@ -2,6 +2,18 @@
 
 <!-- 予約ファイル。フロントマターは付けない。日付見出し（ISO 8601）ごとに新しいものを上に追記する。 -->
 
+## 2026-09-01
+
+### 月次利用量制御を実装した（Task 005）
+
+- `src/worker/services/usage.ts`（`UsageService`: `consumeOcr` / `consumeGemini` / `getUsage`）、`src/worker/routes/usage.ts`（`GET /api/usage`）を追加した。
+- **加算はDB層の単一UPSERTに委ね、読み取り→判定→更新の3段階を禁止した（NF-2-39）。** `src/worker/db/client.ts` に `incrementUsageCounter` を追加し、`INSERT ... ON CONFLICT(period) DO UPDATE ... WHERE ocrPages < ?` の形で加算と上限判定を1文にした。SQLiteは`WHERE`不成立時に`DO NOTHING`と同じ挙動になり`RETURNING`が空になる。これを影響0行として`USAGE_LIMIT_EXCEEDED`（429）に変換する。
+- **期間キー（`YYYY-MM`・JST）は新しい月ごとに新しい行になる設計にした。** 明示的なリセット処理を持たず（NF-2-19）、過去の期間キーの行は書き込み対象にならないため触れられない。F-9のデモリセットが`UsageCounter`を変更できない制約（NF-2-40）を、削除しないという運用ルールではなく構造で保証する。
+- JST変換はホストのタイムゾーン設定に依存させないため、UTC epochへ9時間を加算してからUTC getterで読む方式にした。
+- `src/worker/observability/operation-trace.ts` の `DatabaseTable` に `"usage_counter"` を追加し、既存の`executeOperation`境界（LOG-1）へ乗せた。`usage_counter`は非Tenantテーブルのため`TenantScopedTable`（`ScopedDb`が使う型）には追加していない。
+- テストは並行リクエストでの上限超過が起きないこと（`Promise.allSettled`）、JST月替わりで新しい期間が0から始まり旧期間の行が変化しないこと、上限引き下げ後も既存消費量が新上限を超えていれば即fail closedになること（NF-2-37）を確認した。
+- `corepack pnpm lint` / `test`（19ファイル・130テスト、新規11件）/ `build` / `git diff --check` で確認した。
+
 ## 2026-08-31
 
 ### テストファイルをモジュール本体から分離し `test/` へ集約した

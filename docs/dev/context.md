@@ -151,7 +151,8 @@ Biomeは `src/**`、ルートの `*.ts` / `*.json`、`index.html` を対象に�
 
 ## Current Development State
 
-- Task 001〜004 まで完了（共有型・設定・テナント境界／リポジトリとシード／アプリ内認証とロール認可／SPA認証シェルとログイン画面）。
+- Task 001〜005 まで完了(共有型・設定・テナント境界／リポジトリとシード／アプリ内認証とロール認可／SPA認証シェルとログイン画面／月次利用量制御)。
 - SPAはログインと認証済みの共通枠までが動く。**ルーターは未導入**で、メニュー項目は遷移先が無いため `disabled` のボタン。各画面の中身は後続タスク。
-- 次に着手できるのは Task 005（利用量上限）、012（スタッフ管理）、014（デモデータ初期化）。
+- `GET /api/usage` は実装済み(読み取り専用)。`consumeOcr` / `consumeGemini` を呼び出す帳票読取・業務チェックの各APIは該当タスクが未着手のため、まだ配線されていない。
+- 次に着手できるのは Task 012（スタッフ管理）、014（デモデータ初期化）。
 - 詳細な要件は `knowledge/wiki/requirements/functional.md`、`knowledge/wiki/screens/screen-list.md`、`knowledge/wiki/architecture/api.md` を読む。

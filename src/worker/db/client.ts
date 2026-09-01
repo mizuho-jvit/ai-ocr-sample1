@@ -6,6 +6,7 @@ import {
   type OperationTrace,
 } from "../observability/operation-trace";
 import type {
+  PeriodKey,
   ScopedDb,
   SqlExpr,
   StaffUserId,
@@ -22,6 +23,7 @@ import {
   staffUsers,
   statusHistory,
   tenants,
+  usageCounter,
 } from "./schema";
 import {
   forTenant,
@@ -315,6 +317,93 @@ export async function tenantIds(
       const client = drizzle(database);
       const rows = await client.select({ id: tenants.id }).from(tenants);
       return rows.map((row) => row.id);
+    },
+  );
+}
+
+export interface UsageCounterRow {
+  readonly period: PeriodKey;
+  readonly ocrPages: number;
+  readonly geminiCalls: number;
+}
+
+const USAGE_COUNTER_OPERATION_BASE = {
+  component: "repository",
+  completedStage: "repository.completed",
+  errorType: "D1_OPERATION_FAILED",
+  startedStage: "repository.executing",
+  table: "usage_counter",
+} as const;
+
+/**
+ * 🔵 Intent: `usage_counter` はTenant非依存のためScopedDbを経由しない（ScopedDbのコメント参照）。
+ * 読み取りのみで加算しない（GET /api/usageの契約）。行が無ければnullを返し、呼び出し元が0として扱う。
+ */
+export async function readUsageCounter(
+  database: D1Database,
+  period: PeriodKey,
+  trace?: OperationTrace,
+): Promise<UsageCounterRow | null> {
+  return executeOperation(
+    trace,
+    { ...USAGE_COUNTER_OPERATION_BASE, operation: "usage_counter.selectOne" },
+    async () => {
+      const client = drizzle(database);
+      const rows = await client
+        .select()
+        .from(usageCounter)
+        .where(eq(usageCounter.period, period))
+        .limit(1);
+      return (rows[0] as UsageCounterRow | undefined) ?? null;
+    },
+  );
+}
+
+/**
+ * 🔵 Intent: NF-2-39に従い、加算と上限判定を単一のUPSERTで行う（読み取り→判定→更新の3段階を禁止）。
+ * 新しい期間キーは初回の値がそのまま初期行になる（0からの加算のためlimit>=1のとき常に成立・NF-2-35）。
+ * 既存の期間キーは`ON CONFLICT DO UPDATE ... WHERE`で条件を満たすときだけ加算する。
+ * SQLiteはWHERE不成立時にDO NOTHINGと同じ扱いになり、RETURNINGは行を返さない。
+ * これを影響0行として呼び出し元（services/usage.ts）が上限到達の判断に使う。
+ */
+export async function incrementUsageCounter(
+  database: D1Database,
+  period: PeriodKey,
+  column: "ocrPages" | "geminiCalls",
+  limit: number,
+  trace?: OperationTrace,
+): Promise<UsageCounterRow | null> {
+  return executeOperation(
+    trace,
+    { ...USAGE_COUNTER_OPERATION_BASE, operation: "usage_counter.update" },
+    async () => {
+      const client = drizzle(database);
+      const returning = {
+        geminiCalls: usageCounter.geminiCalls,
+        ocrPages: usageCounter.ocrPages,
+        period: usageCounter.period,
+      };
+      const rows =
+        column === "ocrPages"
+          ? await client
+              .insert(usageCounter)
+              .values({ geminiCalls: 0, ocrPages: 1, period })
+              .onConflictDoUpdate({
+                set: { ocrPages: sql`${usageCounter.ocrPages} + 1` },
+                target: usageCounter.period,
+                where: sql`${usageCounter.ocrPages} < ${limit}`,
+              })
+              .returning(returning)
+          : await client
+              .insert(usageCounter)
+              .values({ geminiCalls: 1, ocrPages: 0, period })
+              .onConflictDoUpdate({
+                set: { geminiCalls: sql`${usageCounter.geminiCalls} + 1` },
+                target: usageCounter.period,
+                where: sql`${usageCounter.geminiCalls} < ${limit}`,
+              })
+              .returning(returning);
+      return (rows[0] as UsageCounterRow | undefined) ?? null;
     },
   );
 }
