@@ -26,6 +26,8 @@ export type OperationStage =
   | "route.executing"
   | "repository.executing"
   | "repository.completed"
+  | "ai.executing"
+  | "ai.completed"
   | "response.created"
   | "request.failed";
 
@@ -36,6 +38,7 @@ export type OperationName =
   | "request.handle"
   | "config.load"
   | "tenant.initialize"
+  | "gemini.generateStructured"
   | `${DatabaseTable}.${DatabaseAction}`;
 
 export interface OperationMetadata {

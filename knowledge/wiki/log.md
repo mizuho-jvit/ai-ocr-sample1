@@ -4,6 +4,18 @@
 
 ## 2026-09-01
 
+### OCR PipelineとAI設定を実装した（Task 006）
+
+- `src/worker/services/gemini-client.ts`（Cloudflare AI Gateway経由でGeminiの`generateContent`を呼ぶ`GeminiClient`）、`src/worker/services/ocr-pipeline.ts`（`OcrPipeline`を実装する`GeminiPipeline`と、モードで実装を選ぶ`createOcrPipeline`）を追加した。
+- **AI GatewayのエンドポイントURLを組み立てるアカウントID・ゲートウェイ名を保持する環境変数が正典に存在しないことに気づいた。** `R2_ACCOUNT_ID`はR2 S3 API専用と明記されており流用できないため、`AI_GATEWAY_ACCOUNT_ID` / `AI_GATEWAY_ID`を新設した（**判断記録 #20・NF-2-46として新規追加**。`non-functional.md`・`types.md`・`ai-api.md`を先に更新してから実装した）。`src/worker/config/load-config.ts`で他の必須設定と同様に起動時検証する。
+- `GeminiClientOptions`に秘密値（`GEMINI_API_KEY`）を渡す設計にした。`AppConfig`には含めない（`load-config.ts`の「秘密値を検証済み設定へコピーしない」方針を維持）。呼び出し元（Task 007で配線予定）が`env.GEMINI_API_KEY`を直接渡す。
+- AI Gatewayの呼び出しは`cf-aig-collect-log-payload: false`ヘッダを明示付与し、既定値に依存せず本文ログを止めた（AI-7a・NF-2-42）。エンドポイントは`https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/google-ai-studio/v1/models/{model}:generateContent`で、これはCloudflare公式ドキュメントで確認済み。ただし`generationConfig.responseSchema`のフィールド型表記（`"OBJECT"`等の大文字列挙）はGoogle Generative Language APIの一般的な規約からの推測であり、ネットワーク制限でai.google.devへ到達できず**実機（`dev:remote`）での検証が必要**。
+- Gemini応答は`candidates[0].content.parts[0].text`をJSONとして再パースし、`docType`・`fields`の必須項目、`confidence`の0〜1範囲を検証した。空欄（`value: ""`）はF-2-5により正当な値として許容し、拒否しない。検証失敗・HTTP失敗・fetch例外はすべて`ApiErrorException("AI_UNAVAILABLE")`（429ではなく503・再試行可）に統一した（AI-7b）。
+- `operation-trace.ts`に`OperationName`の`"gemini.generateStructured"`と`OperationStage`の`"ai.executing"`/`"ai.completed"`を追加し、Gemini呼び出しの外部I/O境界を既存の`executeOperation`（LOG-1）へ乗せた。
+- `createOcrPipeline`は`OCR_PIPELINE_MODE`が`"gemini"`以外（`"document-ai-gemini"`）だと例外を投げる。Document AI実装はTask 018の範囲であり、このタスクでは意図的に未対応。
+- ルート・R2・UsageServiceへの配線はまだ行っていない（`POST /api/ocr/extract`はTask 007の範囲）。`test/worker/services/ocr-pipeline.test.ts`はフェイクの`fetch`注入でGeminiClient/OcrPipelineの契約を単体検証した。
+- `corepack pnpm lint` / `test`（20ファイル・145テスト、新規12件）/ `build` / `git diff --check` で確認した。
+
 ### 月次利用量制御を実装した（Task 005）
 
 - `src/worker/services/usage.ts`（`UsageService`: `consumeOcr` / `consumeGemini` / `getUsage`）、`src/worker/routes/usage.ts`（`GET /api/usage`）を追加した。

@@ -7,6 +7,8 @@ import type { WorkerEnv } from "../../../src/worker/types/env";
 
 function createValidEnv(overrides: Partial<WorkerEnv> = {}): WorkerEnv {
   return {
+    AI_GATEWAY_ACCOUNT_ID: "ai-gateway-account",
+    AI_GATEWAY_ID: "ai-gateway-id",
     ALLOW_DATA_RESET: "true",
     ALLOW_WEAK_PASSWORD_HASH: "true",
     ASSETS: {} as Fetcher,
@@ -41,6 +43,8 @@ describe("loadConfig", () => {
     "OCR_PIPELINE_MODE",
     "GEMINI_MODEL",
     "GEMINI_API_KEY",
+    "AI_GATEWAY_ACCOUNT_ID",
+    "AI_GATEWAY_ID",
     "R2_ACCOUNT_ID",
     "R2_S3_ACCESS_KEY_ID",
     "R2_S3_SECRET_ACCESS_KEY",
@@ -141,6 +145,8 @@ describe("loadConfig", () => {
     const config = loadConfig(env);
 
     expect(config).toEqual({
+      aiGatewayAccountId: "ai-gateway-account",
+      aiGatewayId: "ai-gateway-id",
       allowDataReset: true,
       geminiModel: "gemini-3.1-flash-lite",
       maxCheckRunsPerApplication: 5,

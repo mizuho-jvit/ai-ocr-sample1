@@ -3,7 +3,7 @@ type: architecture
 title: 共有型定義（SPA ↔ Worker の契約）
 description: ロール・状態・OCR抽出結果・業務チェック・名寄せ・APIのDTO・環境設定・テナントスコープ済みハンドルのTypeScript型定義
 tags: [ai-ocr, typescript, types, contract, api, tenant-isolation]
-timestamp: 2026-08-31T00:00:00Z
+timestamp: 2026-09-01T00:00:00Z
 ---
 
 # 共有型定義（SPA ↔ Worker の契約）
@@ -546,6 +546,8 @@ export interface Env {
   ALLOW_DATA_RESET?: string;
   OCR_PIPELINE_MODE: string;
   GEMINI_MODEL: string;
+  AI_GATEWAY_ACCOUNT_ID: string;
+  AI_GATEWAY_ID: string;
   R2_ACCOUNT_ID: string;
 
   // Workers Secret
@@ -576,6 +578,8 @@ export interface Config {
   allowDataReset: boolean;
   ocrPipelineMode: OcrPipelineMode;
   geminiModel: string;
+  aiGatewayAccountId: string;
+  aiGatewayId: string;
 }
 
 export declare function loadConfig(env: Env): Config;

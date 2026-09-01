@@ -151,8 +151,9 @@ Biomeは `src/**`、ルートの `*.ts` / `*.json`、`index.html` を対象に�
 
 ## Current Development State
 
-- Task 001〜005 まで完了(共有型・設定・テナント境界／リポジトリとシード／アプリ内認証とロール認可／SPA認証シェルとログイン画面／月次利用量制御)。
+- Task 001〜006 まで完了(共有型・設定・テナント境界／リポジトリとシード／アプリ内認証とロール認可／SPA認証シェルとログイン画面／月次利用量制御／OCR PipelineとAI設定)。
 - SPAはログインと認証済みの共通枠までが動く。**ルーターは未導入**で、メニュー項目は遷移先が無いため `disabled` のボタン。各画面の中身は後続タスク。
-- `GET /api/usage` は実装済み(読み取り専用)。`consumeOcr` / `consumeGemini` を呼び出す帳票読取・業務チェックの各APIは該当タスクが未着手のため、まだ配線されていない。
-- 次に着手できるのは Task 012（スタッフ管理）、014（デモデータ初期化）。
+- `GET /api/usage` は実装済み(読み取り専用)。`OcrPipeline`(`createOcrPipeline` / `GeminiPipeline`)も実装済みだが、`POST /api/ocr/extract` はまだ無く、`consumeOcr` / `consumeGemini` を呼ぶ経路は配線されていない(Task 007がルート・R2・Usageの結線を担当)。
+- AI Gatewayの呼び出しには新設の `AI_GATEWAY_ACCOUNT_ID` / `AI_GATEWAY_ID` が必須(NF-2-46・判断記録 #20)。ローカルの `.dev.vars` に未設定なら追加すること。
+- 次に着手できるのは Task 007（OCR受付・原本画像管理・読取画面）。依存(003・004・006・017)はすべて完了済み。012（スタッフ管理）・014（デモデータリセット）も依存は満たすが優先度は低い。
 - 詳細な要件は `knowledge/wiki/requirements/functional.md`、`knowledge/wiki/screens/screen-list.md`、`knowledge/wiki/architecture/api.md` を読む。

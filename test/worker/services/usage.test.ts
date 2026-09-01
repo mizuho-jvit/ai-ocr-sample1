@@ -10,6 +10,8 @@ const testEnvironment = env as typeof env & {
 };
 
 const CONFIG: AppConfig = {
+  aiGatewayAccountId: "test-ai-gateway-account",
+  aiGatewayId: "test-ai-gateway-id",
   allowDataReset: true,
   geminiModel: "gemini-3.1-flash-lite",
   maxCheckRunsPerApplication: 5,

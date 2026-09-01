@@ -5,6 +5,8 @@ import { type AppConfig, toTenantId } from "../../../src/worker/types";
 const TENANT_FROM_CONFIG = toTenantId("tenant-from-config");
 
 const CONFIG: AppConfig = {
+  aiGatewayAccountId: "test-ai-gateway-account",
+  aiGatewayId: "test-ai-gateway-id",
   allowDataReset: false,
   geminiModel: "gemini-3.1-flash-lite",
   maxCheckRunsPerApplication: 5,

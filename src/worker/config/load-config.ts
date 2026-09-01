@@ -91,6 +91,15 @@ function validateSecrets(env: WorkerEnv): void {
   requireSetting(env, "R2_S3_SECRET_ACCESS_KEY");
 }
 
+/**
+ * 🔵 Intent: NF-2-46。AI GatewayのエンドポイントURLを組み立てるアカウントIDと
+ * ゲートウェイ名は`R2_ACCOUNT_ID`と用途が異なるため独立して検証する(判断記録 #20)。
+ */
+function validateAiGatewaySettings(env: WorkerEnv): void {
+  requireSetting(env, "AI_GATEWAY_ACCOUNT_ID");
+  requireSetting(env, "AI_GATEWAY_ID");
+}
+
 function validatePbkdf2Iterations(env: WorkerEnv, iterations: number): void {
   if (
     iterations < MINIMUM_PRODUCTION_PBKDF2_ITERATIONS &&
@@ -121,9 +130,12 @@ export function loadConfig(env: WorkerEnv): AppConfig {
   validatePbkdf2Iterations(env, pbkdf2Iterations);
   validateSecrets(env);
   validateDocumentAiSettings(env, ocrPipelineMode);
+  validateAiGatewaySettings(env);
   requireSetting(env, "R2_ACCOUNT_ID");
 
   return {
+    aiGatewayAccountId: requireSetting(env, "AI_GATEWAY_ACCOUNT_ID"),
+    aiGatewayId: requireSetting(env, "AI_GATEWAY_ID"),
     allowDataReset: env.ALLOW_DATA_RESET === "true",
     geminiModel: requireSetting(env, "GEMINI_MODEL"),
     maxCheckRunsPerApplication: requirePositiveInteger(

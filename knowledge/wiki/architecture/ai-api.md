@@ -3,7 +3,7 @@ type: architecture
 title: 外部OCR・AI API（Gemini / Document AI / AI Gateway）
 description: MVP 1.0のGemini単体構成とMVP 1.1のDocument AI＋Gemini構成、責任境界、コスト、認証、実装方針
 tags: [ai-ocr, gemini, document-ai, ai-gateway, cost, model-selection]
-timestamp: 2026-08-20T00:00:00Z
+timestamp: 2026-09-01T00:00:00Z
 ---
 
 # 外部OCR・AI API（Gemini / Document AI / AI Gateway）
@@ -139,6 +139,8 @@ class DocumentAiGeminiPipeline implements OcrPipeline {}
 
 ### 外部呼び出し
 
+**AI GatewayはBYOK構成のGoogle AI Studio互換エンドポイント（Universal Endpoint）を使用し、Workers AIバインディング（`env.AI`）は経由しない。** エンドポイントURLは `https://gateway.ai.cloudflare.com/v1/{AI_GATEWAY_ACCOUNT_ID}/{AI_GATEWAY_ID}/google-ai-studio/v1beta/models/{GEMINI_MODEL}:generateContent` の形で、`GEMINI_API_KEY` を `x-goog-api-key` ヘッダに、`cf-aig-collect-log-payload: false` をAI-7aのペイロードログ無効化ヘッダとして付与する（判断記録 #20）。
+
 **ID は正典化元の原本（要件定義書 v1.11 §8.3）に揃える。** 原本で重複している ID は枝番 `a` / `b` で区別する（[規約](#枝番-a--b-の規約と原本-83-の-id-重複)）。番号の欠番は、その項が本ページの散文にあることを意味する（[所在](#表に載せていない原本の-ai-x)）。
 
 | ID | 方針 |
@@ -197,6 +199,8 @@ class DocumentAiGeminiPipeline implements OcrPipeline {}
 | `OCR_PIPELINE_MODE` | `gemini` | `document-ai-gemini` | 通常の環境変数 |
 | `GEMINI_MODEL` | `gemini-3.1-flash-lite` | 同左 | 通常の環境変数 |
 | `GEMINI_API_KEY` | 必須 | 必須 | Workers Secret |
+| `AI_GATEWAY_ACCOUNT_ID` | 必須 | 必須 | 通常の環境変数 |
+| `AI_GATEWAY_ID` | 必須 | 必須 | 通常の環境変数 |
 | `GOOGLE_CLOUD_PROJECT_ID` | 不要 | 必須 | 通常の環境変数 |
 | `DOCUMENT_AI_LOCATION` | 不要 | 必須 | 通常の環境変数 |
 | `DOCUMENT_AI_PROCESSOR_ID` | 不要 | 必須 | 通常の環境変数 |

@@ -1,7 +1,7 @@
 ---
 id: "006"
 title: "MVP 1.0のOCR PipelineとAI設定を実装"
-status: pending
+status: done
 priority: 1
 dependencies: ["001", "005"]
 estimated_complexity: high

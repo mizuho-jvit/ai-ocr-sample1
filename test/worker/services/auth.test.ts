@@ -33,6 +33,8 @@ const TEST_ITERATIONS = 1_000;
 const PASSWORD = "correct horse battery staple";
 
 const CONFIG: AppConfig = {
+  aiGatewayAccountId: "test-ai-gateway-account",
+  aiGatewayId: "test-ai-gateway-id",
   allowDataReset: true,
   geminiModel: "gemini-3.1-flash-lite",
   maxCheckRunsPerApplication: 5,

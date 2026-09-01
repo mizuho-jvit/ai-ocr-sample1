@@ -8,6 +8,8 @@ const BASIC_AUTHORIZATION = `Basic ${btoa(
 
 function createTestEnv(): WorkerEnv {
   return {
+    AI_GATEWAY_ACCOUNT_ID: "test-ai-gateway-account",
+    AI_GATEWAY_ID: "test-ai-gateway-id",
     ALLOW_DATA_RESET: "true",
     ALLOW_WEAK_PASSWORD_HASH: "true",
     ASSETS: {

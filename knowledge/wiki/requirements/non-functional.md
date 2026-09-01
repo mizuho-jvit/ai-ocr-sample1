@@ -3,7 +3,7 @@ type: requirement
 title: 非機能要件（性能・セキュリティ・データ保持・保守性）
 description: MVP 1.0／1.1のOCR性能目標、PBKDF2、AI呼び出し上限、Document AI認証、原本画像の30日保持、環境変数一覧
 tags: [ai-ocr, non-functional, security, pbkdf2, cost-control, performance, document-ai]
-timestamp: 2026-08-31T00:00:00Z
+timestamp: 2026-09-01T00:00:00Z
 ---
 
 # 非機能要件（性能・セキュリティ・データ保持・保守性）
@@ -63,6 +63,7 @@ timestamp: 2026-08-31T00:00:00Z
 | NF-2-43 | **ペイロードを止める一方で、ログのメタデータ収集は維持する**（トークン数・モデル・プロバイダ・ステータスコード・費用・所要時間）。`cf-aig-collect-log: false` でエントリ全体を止めない。[コスト試算](../architecture/ai-cost-simulation.md)で保留している実トークン数の計測に必要である |
 | NF-2-44 | **AI Gateway の Guardrails を使用しない。** Guardrails は判定モデル（`@cf/meta/llama-guard-3-8b`）をWorkers AIのトークン推論として課金するため、BYOK構成に不要な課金経路を持ち込む。入出力の検査はGeminiのStructured Outputsとアプリケーション側の検証で行う |
 | NF-2-45 | **ゲートウェイの「Workers AI 課金」設定は「標準課金」を選択する。** 「統合課金」はAI Gatewayのクレジット残高からリアルタイムに引き落とす方式で、クレジットに対し5%の手数料が発生する。BYOK（自前のGemini APIキー）構成では不要である |
+| NF-2-46 | **AI GatewayのエンドポイントURLを組み立てるCloudflareアカウントIDとゲートウェイ名を環境変数 `AI_GATEWAY_ACCOUNT_ID` / `AI_GATEWAY_ID` で指定する。** デフォルト値を持たず、いずれか未設定の場合は起動を失敗させる。`R2_ACCOUNT_ID`（R2 S3 API専用）とは用途が異なるため流用しない |
 
 ### AI呼び出し回数の上限（アプリケーション側）
 
@@ -147,6 +148,8 @@ NF-2-15 は Cloudflare 側の最終的な歯止めであり、到達した時点
 | `OCR_PIPELINE_MODE` | 1.0: `gemini`／1.1: `document-ai-gemini` | **起動失敗** | NF-4-5 |
 | `GEMINI_MODEL` | `gemini-3.1-flash-lite` | **起動失敗** | NF-4-6 |
 | `GEMINI_API_KEY` | Gemini APIキー（Workers Secret） | **起動失敗** | NF-2-13 |
+| `AI_GATEWAY_ACCOUNT_ID` | AI Gatewayが属するCloudflare Account ID | **起動失敗** | NF-2-46・判断記録 #20 |
+| `AI_GATEWAY_ID` | Gemini呼び出し用に作成したAI Gatewayのゲートウェイ名 | **起動失敗** | NF-2-46・判断記録 #20 |
 | `R2_ACCOUNT_ID` | R2 S3 APIのCloudflare Account ID | **起動失敗** | NF-2-14・判断記録 #18 |
 | `R2_S3_ACCESS_KEY_ID` | 署名URL発行専用のR2 S3 API Access Key ID（Workers Secret） | **起動失敗** | NF-2-14・判断記録 #18 |
 | `R2_S3_SECRET_ACCESS_KEY` | 署名URL発行専用のR2 S3 API Secret Access Key（Workers Secret） | **起動失敗** | NF-2-14・判断記録 #18 |

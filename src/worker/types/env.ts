@@ -14,6 +14,8 @@ export interface WorkerEnv {
   ALLOW_DATA_RESET?: string;
   OCR_PIPELINE_MODE: string;
   GEMINI_MODEL: string;
+  AI_GATEWAY_ACCOUNT_ID: string;
+  AI_GATEWAY_ID: string;
   R2_ACCOUNT_ID: string;
 
   BASIC_AUTH_USERNAME: string;
@@ -38,6 +40,8 @@ export interface AppConfig {
   allowDataReset: boolean;
   ocrPipelineMode: OcrPipelineMode;
   geminiModel: string;
+  aiGatewayAccountId: string;
+  aiGatewayId: string;
 }
 
 export type Config = AppConfig;
