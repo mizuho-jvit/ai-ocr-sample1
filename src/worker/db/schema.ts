@@ -129,6 +129,19 @@ export const members = sqliteTable(
       "members_status_check",
       sql`${table.status} IN (${sql.raw(MEMBER_STATUS_VALUES)})`,
     ),
+    /**
+     * 🔵 Intent: matching.tsのscoreMemberはphone/birthDateを正規化済み前提で生の値と比較する
+     * （normalizeMemberInputを経由しない書き込み経路が将来加わっても照合が壊れないよう、
+     * DB側でも形式を強制する）。
+     */
+    check(
+      "members_phone_digits_check",
+      sql`${table.phone} != '' AND ${table.phone} NOT GLOB '*[^0-9]*'`,
+    ),
+    check(
+      "members_birth_date_format_check",
+      sql`${table.birthDate} IS NULL OR ${table.birthDate} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`,
+    ),
   ],
 );
 

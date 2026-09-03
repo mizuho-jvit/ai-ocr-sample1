@@ -93,6 +93,39 @@ describe("TenantRepository", () => {
     expect(tenantBMember?.status).toBe("active");
   });
 
+  it("find() returns every matching row within the tenant, unlike findOne()", async () => {
+    const repository = createTenantRepository(env.DB);
+    const tenantA = repository.forTenant(TENANT_A);
+    const tenantB = repository.forTenant(TENANT_B);
+
+    const memberA1 = toMemberId("member-a-shared-1");
+    const memberA2 = toMemberId("member-a-shared-2");
+    const memberB = toMemberId("member-b-shared");
+
+    await tenantA.members.insert(
+      memberValues(memberA1, "A-shared-1", "共有氏名"),
+    );
+    await tenantA.members.insert(
+      memberValues(memberA2, "A-shared-2", "共有氏名"),
+    );
+    await tenantB.members.insert(memberValues(memberB, "B-shared", "共有氏名"));
+
+    const sharedName = whereFieldEquals(
+      "members",
+      "nameNormalized",
+      "共有氏名",
+    );
+
+    expect(
+      (await tenantA.members.find(sharedName))
+        .map((member) => member.id)
+        .sort(),
+    ).toEqual([memberA1, memberA2].sort());
+
+    const single = await tenantA.members.findOne(sharedName);
+    expect(single).not.toBeNull();
+  });
+
   it("does not expose the global usage counter as a tenant repository", () => {
     type Repositories = ReturnType<
       ReturnType<typeof createTenantRepository>["forTenant"]

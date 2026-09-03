@@ -16,7 +16,7 @@ estimated_complexity: high
 ## Interfaces
 
 ```ts
-function exportApplications(scope: TenantScope): Promise<Response>; // 🔵
+function exportApplications(repositories: TenantScopedRepositories): Promise<Response>; // 🔵
 function importMembers(file: File, actor: SessionActor): Promise<ImportMembersResponse>; // 🔵
 ```
 
@@ -30,6 +30,7 @@ function importMembers(file: File, actor: SessionActor): Promise<ImportMembersRe
 ## Implementation Notes
 
 - CSV・集計もテナントスコープを必須にする。
+- `exportApplications`は`TenantScopedRepositories`（DI・`context.get("repository").forTenant()`）をそのまま受け取る。Task 008の`matching.ts`が定義する`TenantScope`（`applicationId`必須）はF-6-10の「対象申請に対するrejected除外」専用の型であり、`exportApplications`は`findMatchCandidates`を呼ばず対象申請という概念も無いため、この型を再利用しないこと（[決定#24](../../../../../knowledge/wiki/requirements/decisions.md)）。
 
 ## Files
 

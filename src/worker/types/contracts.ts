@@ -164,7 +164,7 @@ export interface NormalizedKeys {
 export interface RuleScoreBreakdown {
   kanaAndBirthDate: boolean;
   phone: boolean;
-  nameAndAddressPrefix: boolean;
+  name: boolean;
   total: number;
 }
 
@@ -407,6 +407,7 @@ export type ErrorCode =
   | "INVALID_TRANSITION"
   | "CHECK_RUN_LIMIT"
   | "VALIDATION_ERROR"
+  | "INVALID_DATE"
   | "USAGE_LIMIT_EXCEEDED"
   | "AI_UNAVAILABLE"
   | "INTERNAL";

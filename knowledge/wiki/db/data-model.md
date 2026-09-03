@@ -224,10 +224,10 @@ DTO 側（[types.md](../architecture/types.md)）の `processedBy` / `lastEdited
 | nameKana | TEXT | NULL可 |
 | nameNormalized | TEXT | JSON対応表と決定的な正規化処理から生成する検索・名寄せ用の値（F-6-1・2・11） |
 | kanaNormalized | TEXT | |
-| birthDate | DATE | NULL可 |
+| birthDate | DATE | NULL可。`YYYY-MM-DD`固定。CHECK制約で形式を強制する |
 | postalCode | TEXT | NULL可 |
 | address | TEXT | NULL可 |
-| phone | TEXT | ハイフン除去して保存 |
+| phone | TEXT | ハイフン除去して保存。CHECK制約で数字のみ・空文字禁止を強制する |
 | email | TEXT | NULL可 |
 | status | TEXT | `pending` \| `active` \| `suspended` \| `inactive` |
 | isSeed | BOOLEAN | 既定 false。シード投入された会員のみ true（F-9-2） |
@@ -245,6 +245,8 @@ DTO 側（[types.md](../architecture/types.md)）の `processedBy` / `lastEdited
 | `(tenantId, nameNormalized)` | 氏名の正規化照合（F-6） |
 | `(tenantId, kanaNormalized)` | カナの正規化照合（F-6） |
 | `(tenantId, phone)` | 電話番号一致（F-6） |
+
+**CHECK** — `matching.ts`のスコアリングは`phone`/`birthDate`を`normalizeMemberInput`が出力した形式のまま生の値で比較する。この形式を書き込み経路（Task 011の登録・編集、Task 013のCSVインポート等）を問わずDB側でも強制するため、`phone != '' AND phone NOT GLOB '*[^0-9]*'`（数字のみ・空文字禁止）と`birthDate IS NULL OR birthDate GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`（`YYYY-MM-DD`固定・ゼロ埋め必須）を追加した。`nameNormalized`/`kanaNormalized`は自由なかな漢字のため形式チェックは書けず、`normalizeMemberInput`を経由する運用に引き続き依存する。
 
 > 旧字体・異体字対応表はDBマスターとして保持しない。MVPではGit管理するJSONをアプリケーション資産として同梱し、会員の登録・編集・CSVインポート時に `nameNormalized` を生成する（F-6-11、NF-4-4）。
 

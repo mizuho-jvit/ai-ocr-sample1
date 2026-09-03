@@ -34,6 +34,7 @@ export interface TableRepository<
   Insert extends TenantRow,
 > {
   all(): Promise<Row[]>;
+  find(where: SqlExpr): Promise<Row[]>;
   findOne(where: SqlExpr): Promise<Row | null>;
   insert(values: WithoutTenant<Insert>): Promise<Row>;
   update(values: Partial<WithoutTenant<Row>>, where: SqlExpr): Promise<number>;
@@ -119,6 +120,7 @@ function tableRepository<Row extends TenantRow, Insert extends TenantRow>(
   return Object.freeze({
     all: () => scopedDatabase.select<Row>(table),
     delete: (where: SqlExpr) => scopedDatabase.delete(table, where),
+    find: (where: SqlExpr) => scopedDatabase.select<Row>(table, where),
     findOne: (where: SqlExpr) => scopedDatabase.selectOne<Row>(table, where),
     insert: (values: WithoutTenant<Insert>) =>
       scopedDatabase.insert<Row>(

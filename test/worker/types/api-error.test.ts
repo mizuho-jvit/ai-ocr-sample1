@@ -27,4 +27,13 @@ describe("toApiError", () => {
     expect(apiError.error.message).toContain("翌月");
     expect(apiError.error.message).toMatch(/引き上げ.*再デプロイ/);
   });
+
+  it("converts INVALID_DATE to a 422 with a fixed Japanese message", () => {
+    const error = new ApiErrorException("INVALID_DATE");
+
+    expect(apiErrorStatus(error)).toBe(422);
+    const apiError = toApiError(error);
+    expect(apiError.error.code).toBe("INVALID_DATE");
+    expect(apiError.error.message).toBe("不正な日付です。");
+  });
 });

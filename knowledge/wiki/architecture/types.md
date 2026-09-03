@@ -187,11 +187,11 @@ export interface NormalizedKeys {
   phoneNormalized: string | null;
 }
 
-/** 第1段のスコアリング内訳（F-6-3）。重みは定数として一元管理する（NF-4-3） */
+/** 第1段のスコアリング内訳（F-6-3）。重みは定数として一元管理する（NF-4-3）。住所は一致条件に含めない（決定#21） */
 export interface RuleScoreBreakdown {
   kanaAndBirthDate: boolean;
   phone: boolean;
-  nameAndAddressPrefix: boolean;
+  name: boolean;
   total: number;
 }
 
@@ -621,6 +621,37 @@ export declare function forTenant(tenantId: TenantId): ScopedDb;
 - `insert` の `values` から `tenantId` を `Omit` する。呼び出し側が別テナントの ID を渡す余地をなくす
 - `UsageCounter` は `tenantId` を持たない唯一のテーブルであり（NF-2-41）、`TenantScopedTable` に含めない。**専用の別モジュールから扱い、業務データへの参照を持たせない**（[データモデル](../db/data-model.md#他テーブルと異なる3点)）
 - JOIN を行うヘルパを追加する場合、結合先テーブルにも個別に条件を付与する（NF-5-17）
+
+### 9.1 リポジトリ層（route/serviceへ実際に渡る型）
+
+`ScopedDb`はテーブル名を文字列で渡す汎用ハンドルであり、**route/serviceへ直接は渡さない。** リポジトリ層（`src/worker/db/repositories.ts`）がテーブルごとに型付けした`TableRepository`でさらに1段ラップし、DI（`context.get("repository").forTenant(tenantId)`）経由で渡すのはこちらである（NF-4-1）。`ScopedDb`はこのラップの内部実装としてのみ使われ、外へは出さない。
+
+```ts
+export interface TableRepository<Row, Insert> {
+  all(): Promise<Row[]>;
+  /** 条件に合う複数行を返す。findOneと違い該当が2件以上でも取りこぼさない。 */
+  find(where: SqlExpr): Promise<Row[]>;
+  findOne(where: SqlExpr): Promise<Row | null>;
+  insert(values: Omit<Insert, 'tenantId'>): Promise<Row>;
+  update(values: Partial<Omit<Row, 'tenantId'>>, where: SqlExpr): Promise<number>;
+  delete(where: SqlExpr): Promise<number>;
+}
+
+export interface TenantScopedRepositories {
+  readonly applications: TableRepository<Application, ApplicationInsert>;
+  readonly appStatusHistory: TableRepository<AppStatusHistory, AppStatusHistoryInsert>;
+  readonly checkRuns: TableRepository<CheckRun, CheckRunInsert>;
+  readonly matchCandidates: TableRepository<MatchCandidate, MatchCandidateInsert>;
+  readonly members: TableRepository<Member, MemberInsert>;
+  readonly sessions: TableRepository<Session, SessionInsert>;
+  readonly staffUsers: StaffUserRepository; // TableRepository + ログイン失敗計上の専用メソッド
+  readonly statusHistory: TableRepository<StatusHistory, StatusHistoryInsert>;
+}
+
+export declare function forTenant(tenantId: TenantId): TenantScopedRepositories;
+```
+
+`find`は「あるカラムの値に一致する複数行」を返すためのメソッドである。`findOne`は該当が2件以上あっても1件しか返さないため、同じ電話番号を共有する家族や同姓同名の会員を取りこぼす箇所（F-6の名寄せ候補抽出等）では`find`を使う。
 
 ## 10. エラー
 

@@ -2,6 +2,20 @@
 
 <!-- 予約ファイル。フロントマターは付けない。日付見出し（ISO 8601）ごとに新しいものを上に追記する。 -->
 
+## 2026-09-02
+
+### Task 008の名寄せ条件・生年月日正規化をコードレビュー指摘に基づき修正した
+
+- **F-6-3の住所前方一致条件を撤廃した（[決定#21](./requirements/decisions.md)）。** `memberAddress.startsWith(input.address)`は「入力側住所の方が会員DB側より簡略」という一方向の前提に依存しており、実務で起こりやすい逆方向（OCR側の方が番地・建物名まで詳しい）を検出できない設計上の欠陥があった。ユーザーの判断で双方向化はせず、一致条件を氏名・カナ+生年月日・電話番号までに絞った。`functional.md`のF-6-3と`architecture/types.md`の`RuleScoreBreakdown`（`nameAndAddressPrefix`→`name`）を正典側も更新し、`MemberIdentity`/`NormalizedMemberIdentity`から`address`と`normalizeAddress`/`normalizeAddressForComparison`を削除した。
+- **候補抽出が`members`テーブルを毎回全件スキャンしていた問題を修正した。** カナ+生年月日・電話・氏名の3条件それぞれが成立し得る場合だけ、対応する既存インデックス（`members_tenant_kana_normalized_index`等）で絞り込む問い合わせに変更した。同点時の上位5件が非決定的だった問題も、`member.id`昇順の第二ソートで解消した。
+- **生年月日の存在チェックと改元当日の月日境界検証を追加した。** 大正=1912-07-30、昭和=1926-12-25、平成=1989-01-08、令和=2019-05-01の各起点日（明治のみ史実上の日単位対応が定まらないため西暦1868-01-25を採用）を基準に、実在しない年月日および改元当日を跨ぐ和暦を`ApiErrorException("INVALID_DATE")`（422・「不正な日付です。」）で拒否するようにした。日付として一切パースできない値（「不明」等）は従来どおりnullを返す。`ErrorCode`に`INVALID_DATE`を新設した。
+- **生年月日の区切り文字としてダッシュ系異体字（U+2010・U+2015・U+2212・長音記号U+30FC）を半角ハイフンへ畳み込むようにした。** NFKCは全角ハイフンマイナス（U+FF0D）のみを半角化し、これら4種は正規化等価ではないため対象外だった。氏名・カナ（特に長音記号「ー」）には適用しない。住所側の同種異体字はユーザー判断で対象外とした。
+- **`members.phone`/`birthDate`の形式をDB CHECK制約で強制するようにした。** `scoreMember`はこれらの列を`normalizeMemberInput`の出力形式のまま生の値で比較するが、その形式を保証する仕組みが`normalizeMemberInput`を呼ぶという慣習しかなく、Task 011（登録・編集）やTask 013（CSVインポート）が別経路で書き込むと名寄せが静かに壊れる指摘を受けた。`schema.ts`へ`members_phone_digits_check`（数字のみ・空文字禁止）と`members_birth_date_format_check`（NULLまたは`YYYY-MM-DD`固定）を追加し、`corepack pnpm db:generate`で`drizzle/0001_friendly_bullseye.sql`を生成した。`nameNormalized`/`kanaNormalized`は自由なかな漢字のため形式チェックが書けず対象外（`data-model.md`のMember節を更新）。制約が実際に機能することを`test/worker/db/schema.test.ts`で検証した。
+- **スコアの重み（決定#22）と和暦変換規則（決定#23）をwikiへ正典化した。** これまで`docs/dev/context.md`とTask 008のタスクファイルにしか記録がなく、CLAUDE.mdの「長寿命の設計情報がdocs/dev/に生成されたらwikiへ正典化する」に反する指摘を受けた。`decisions.md`に決定#22（カナ+生年月日=60・電話=60・氏名一致=30）・決定#23（各元号の起点日と改元当日の月日境界検証・INVALID_DATE）を追加し、`functional.md`のF-6-1・F-6-3から相互参照した。`docs/dev/context.md`側は数値の再掲をやめ、wikiへのリンクに置き換えた。**`TenantScope`の形（`db: ScopedDb`とDI層の型不一致）は未修正のまま設計不整合が残っているため、正典化は見送った**（正しい形が決まった時点で決定として記録する）。
+- **`TableRepository`に`find(where): Promise<Row[]>`を追加し、`TenantScope`のDI不一致を解消した（決定#24）。** `TenantScopedRepositories`（DIが実際に渡す型）の`TableRepository`には`all()`（無条件）と`findOne()`（1件のみ）しかなく、条件付きで複数行を返す手段が無かった。これが`findMatchCandidates`が生の`ScopedDb`を要求し、DIを迂回して`createScopedDatabase`を自前で組み立てる必要があった根本原因だった。`repositories.ts`へ`find`を追加し、`TenantScope.db: ScopedDb`を`TenantScope.repositories: TenantScopedRepositories`へ置き換えて、`findMatchCandidates`がDIだけで完結するようにした。`architecture/types.md`に`TableRepository`/`TenantScopedRepositories`の節（§9.1）を新設し、`ScopedDb`が直接route/serviceへ渡らないことも明記した。
+- **`applicationId`必須がTask 013と噛み合わない件は、実装上の不整合ではなく命名の偶然だったと判明したため訂正した。** `exportApplications`（申請台帳のCSVエクスポート）は`applications`/`check_runs`等から読むだけで`findMatchCandidates`もF-6-10のrejected除外も呼ばない。`TenantScope`はF-6-10専用に`applicationId`を持たせた型であり、Task 013側がわざわざこれをimportして使う理由がそもそも無い。Task 013のタスクファイルの疑似コードを`repositories: TenantScopedRepositories`（`applicationId`なし）に直し、`matching.ts`の`TenantScope`を再利用しないよう実装メモへ明記した。`matching.ts`側の変更は不要だった。
+- `corepack pnpm test`（28ファイル・239テスト）/ `lint` / `build` / `git diff --check` で確認した。Task 008一式は未コミットのまま。
+
 ## 2026-09-01
 
 ### 読取結果画面にドロップゾーンが二重表示される不具合を修正した
