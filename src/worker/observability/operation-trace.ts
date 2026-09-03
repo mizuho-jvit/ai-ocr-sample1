@@ -41,6 +41,7 @@ export type OperationName =
   | "gemini.generateStructured"
   | "image.put"
   | "image.delete"
+  | "repository.batch"
   | `${DatabaseTable}.${DatabaseAction}`;
 
 export interface OperationMetadata {

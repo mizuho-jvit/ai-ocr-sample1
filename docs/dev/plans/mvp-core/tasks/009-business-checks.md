@@ -1,7 +1,7 @@
 ---
 id: "009"
 title: "AI業務チェックとCheckRun保存を実装"
-status: pending
+status: done
 priority: 1
 dependencies: ["003", "005", "006", "008"]
 estimated_complexity: high
@@ -11,7 +11,7 @@ estimated_complexity: high
 
 ## Goal
 
-申請の整合性・不備・トリアージ・差戻し案・AI名寄せ判定を実行し、履歴として保存する。
+申請の整合性・不備・トリアージ・差戻し案をAIで判定し、名寄せ候補の同一人物可能性はルールベース（決定#27）で判定して、履歴として保存する。
 
 ## Interfaces
 
@@ -23,7 +23,7 @@ async function runBusinessCheck(actor: SessionActor, applicationId: string): Pro
 
 - [ ] approvedまたは回数上限では409を返しAIを呼ばない。
 - [ ] receivedはunder_reviewへ遷移して履歴を残す。
-- [ ] 候補5件だけをAIへ渡し、CheckRun/最新ID/MatchCandidateを保存する。
+- [ ] 名寄せ候補（上位5件）はAIへ渡さずルールベースで判定し、CheckRun/最新ID/MatchCandidateを保存する。
 - [ ] 不備時のみ200字以内の下書きを返し、Gemini上限で429にする。
 
 ## Implementation Notes

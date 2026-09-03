@@ -1,5 +1,6 @@
 import type {
   ScopedDb,
+  ScopedWriteOp,
   SqlExpr,
   TenantId,
   TenantInsertValues,
@@ -39,6 +40,16 @@ export interface TenantScopedExecutor {
     where: TenantScopedWhere,
   ): Promise<number>;
   delete(table: TenantScopedTable, where: TenantScopedWhere): Promise<number>;
+  prepareInsert<Row extends TenantRow>(
+    table: TenantScopedTable,
+    values: Row,
+  ): ScopedWriteOp;
+  prepareUpdate<Row extends TenantRow>(
+    table: TenantScopedTable,
+    values: TenantUpdateValues<Row>,
+    where: TenantScopedWhere,
+  ): ScopedWriteOp;
+  batch(operations: readonly ScopedWriteOp[]): Promise<void>;
 }
 
 function scopedWhere(
@@ -81,6 +92,7 @@ export function forTenant(
   }
 
   return Object.freeze({
+    batch: (operations: readonly ScopedWriteOp[]) => executor.batch(operations),
     delete: (table, where) =>
       executor.delete(table, scopedWhere(tenantId, where)),
     insert: <Row extends TenantRow>(
@@ -91,6 +103,24 @@ export function forTenant(
         ...values,
         tenantId,
       } as Row),
+    prepareInsert: <Row extends TenantRow>(
+      table: TenantScopedTable,
+      values: TenantInsertValues<Row>,
+    ) =>
+      executor.prepareInsert<Row>(table, {
+        ...values,
+        tenantId,
+      } as Row),
+    prepareUpdate: <Row extends TenantRow>(
+      table: TenantScopedTable,
+      values: TenantUpdateValues<Row>,
+      where: SqlExpr,
+    ) =>
+      executor.prepareUpdate<Row>(
+        table,
+        withoutTenantId<Row>(values),
+        scopedWhere(tenantId, where),
+      ),
     select: <Row extends TenantRow>(
       table: TenantScopedTable,
       where?: SqlExpr,

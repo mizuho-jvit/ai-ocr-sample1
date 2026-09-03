@@ -1,0 +1,1 @@
+ALTER TABLE `applications` ADD `check_run_count` integer DEFAULT 0 NOT NULL;

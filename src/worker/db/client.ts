@@ -6,8 +6,10 @@ import {
   type OperationTrace,
 } from "../observability/operation-trace";
 import type {
+  ApplicationId,
   PeriodKey,
   ScopedDb,
+  ScopedWriteOp,
   SqlExpr,
   StaffUserId,
   TenantId,
@@ -55,6 +57,23 @@ function tableFor(name: TenantScopedTable): ExecutableTenantTable {
   return TENANT_TABLES[name] as ExecutableTenantTable;
 }
 
+interface PendingBatchItem {
+  readonly query: unknown;
+}
+
+/**
+ * 🔵 Intent: `ScopedWriteOp`はSqlExprと同じ「不透明なマーカー型」。ここでだけ
+ * 実際のDrizzleクエリビルダ(未実行)を出し入れする。実行を伴わずbuildだけ行うことで、
+ * 複数の書き込みを`client.batch()`(D1の単一トランザクション)へまとめて渡せる。
+ */
+function wrapBatchItem(query: unknown): ScopedWriteOp {
+  return Object.freeze({ query }) as unknown as ScopedWriteOp;
+}
+
+function unwrapBatchItem(operation: ScopedWriteOp): unknown {
+  return (operation as unknown as PendingBatchItem).query;
+}
+
 function expressionFor(where: TenantScopedWhere, table: ExecutableTenantTable) {
   const tenantExpression = eq(table.tenantId, where.tenant.value);
   if (!where.additional) {
@@ -72,6 +91,30 @@ function createExecutor(
   const client = drizzle(database);
 
   return {
+    async batch(operations) {
+      if (operations.length === 0) {
+        return;
+      }
+      return executeOperation(
+        trace,
+        {
+          component: "repository",
+          completedStage: "repository.completed",
+          errorType: "D1_OPERATION_FAILED",
+          operation: "repository.batch",
+          startedStage: "repository.executing",
+        },
+        async () => {
+          const queries = operations.map(unwrapBatchItem) as [
+            unknown,
+            ...unknown[],
+          ];
+          await client.batch(
+            queries as unknown as Parameters<typeof client.batch>[0],
+          );
+        },
+      );
+    },
     async delete(tableName, where) {
       return executeOperation(
         trace,
@@ -116,6 +159,25 @@ function createExecutor(
           }
           return row as Row;
         },
+      );
+    },
+    prepareInsert<Row>(tableName: TenantScopedTable, values: Row) {
+      const table = tableFor(tableName);
+      return wrapBatchItem(
+        client.insert(table).values(values as Record<string, unknown>),
+      );
+    },
+    prepareUpdate<Row extends { tenantId: string }>(
+      tableName: TenantScopedTable,
+      values: Partial<Omit<Row, "tenantId">>,
+      where: TenantScopedWhere,
+    ) {
+      const table = tableFor(tableName);
+      return wrapBatchItem(
+        client
+          .update(table)
+          .set(values as Record<string, unknown>)
+          .where(expressionFor(where, table)),
       );
     },
     async select<Row>(tableName: TenantScopedTable, where: TenantScopedWhere) {
@@ -296,6 +358,53 @@ export async function registerLoginFailure(
       });
     return rows[0] ?? null;
   });
+}
+
+export interface CheckRunReservation {
+  readonly checkRunCount: number;
+}
+
+/**
+ * 🔵 Intent: コードレビュー指摘#3（Task 009）。NF-2-21の1申請あたりのCheckRun上限を、
+ * usage_counter（NF-2-39・incrementUsageCounter）と同じ「単一の条件付きUPDATE」で
+ * 予約する。件数を読み取ってから判定・AI呼び出し・保存という3段階にすると、上限直前で
+ * 並行した2リクエストがどちらも判定を通過してしまう。ここではAI呼び出しの前に
+ * `applications.check_run_count`を`WHERE check_run_count < limit`付きで加算し、
+ * 影響0行(RETURNINGが空)を上限到達として呼び出し元がCHECK_RUN_LIMIT(409)へ変換する。
+ */
+export async function reserveCheckRunSlot(
+  database: D1Database,
+  tenantId: TenantId,
+  applicationId: ApplicationId,
+  limit: number,
+  trace?: OperationTrace,
+): Promise<CheckRunReservation | null> {
+  return executeOperation(
+    trace,
+    {
+      component: "repository",
+      completedStage: "repository.completed",
+      errorType: "D1_OPERATION_FAILED",
+      operation: "applications.update",
+      startedStage: "repository.executing",
+      table: "applications",
+    },
+    async () => {
+      const client = drizzle(database);
+      const rows = await client
+        .update(applications)
+        .set({ checkRunCount: sql`${applications.checkRunCount} + 1` })
+        .where(
+          and(
+            eq(applications.tenantId, tenantId),
+            eq(applications.id, applicationId),
+            sql`${applications.checkRunCount} < ${limit}`,
+          ),
+        )
+        .returning({ checkRunCount: applications.checkRunCount });
+      return rows[0] ?? null;
+    },
+  );
 }
 
 /** 🔵 Intent: Tenant起動検証のD1読取も共通の例外追跡境界へ通す。 */

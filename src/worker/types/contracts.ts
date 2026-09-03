@@ -8,7 +8,12 @@ export type Triage = "approval_candidate" | "needs_review" | "return_candidate";
 
 export type Likelihood = "high" | "medium" | "low";
 
-export type MatchStatus = "pending" | "merged" | "rejected" | "hold";
+/**
+ * 🔵 Intent: コードレビュー指摘#5（Task 009）。`stale`は職員が選ぶ判断ではなく、
+ * 業務チェック再実施で今回の上位5件から外れた`pending`/`hold`候補をシステムが
+ * 無効化するための内部状態。削除しないのは`hold`の判断記録（F-6-9）を保持するため。
+ */
+export type MatchStatus = "pending" | "merged" | "rejected" | "hold" | "stale";
 
 export type Severity = "error" | "warning";
 
@@ -79,6 +84,18 @@ export interface SqlExpr {
   readonly [SQL_EXPR]: true;
 }
 
+declare const SCOPED_WRITE_OP: unique symbol;
+
+/**
+ * 🔵 Intent: `ScopedDb.batch`へまとめて渡すため、insert/updateを構築するだけで
+ * 実行しない状態のまま持ち回れる不透明なハンドル(SqlExprと同じ「マーカー型」方式)。
+ * Task 009コードレビュー指摘#2: 複数テーブルへの書き込みを1つのD1トランザクションに
+ * まとめるための土台。
+ */
+export interface ScopedWriteOp {
+  readonly [SCOPED_WRITE_OP]: true;
+}
+
 /**
  * A database boundary whose implementation always adds its tenant predicate.
  * `usage_counter` is intentionally absent from TenantScopedTable.
@@ -102,6 +119,22 @@ export interface ScopedDb {
     where: SqlExpr,
   ): Promise<number>;
   delete(table: TenantScopedTable, where: SqlExpr): Promise<number>;
+  /** 実行を伴わずinsertを構築する。`batch`へ渡すためだけに使う。 */
+  prepareInsert<Row extends TenantRow>(
+    table: TenantScopedTable,
+    values: TenantInsertValues<Row>,
+  ): ScopedWriteOp;
+  /** 実行を伴わずupdateを構築する。`batch`へ渡すためだけに使う。 */
+  prepareUpdate<Row extends TenantRow>(
+    table: TenantScopedTable,
+    values: TenantUpdateValues<Row>,
+    where: SqlExpr,
+  ): ScopedWriteOp;
+  /**
+   * `operations`をすべて成功するか、すべて失敗するかのいずれかで実行する
+   * (D1のbatch APIが提供する単一トランザクション)。
+   */
+  batch(operations: readonly ScopedWriteOp[]): Promise<void>;
 }
 
 export interface PreparedImage {
@@ -321,7 +354,8 @@ export interface RunCheckResponse {
 }
 
 export interface DecideMatchRequest {
-  decision: Exclude<MatchStatus, "pending">;
+  /** `stale`はシステム内部状態であり、職員が選べる決定には含めない。 */
+  decision: Exclude<MatchStatus, "pending" | "stale">;
 }
 
 export interface DecideMatchResponse {

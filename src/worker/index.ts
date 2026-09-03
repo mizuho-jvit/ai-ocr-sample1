@@ -21,6 +21,7 @@ import {
   createProtectedAuthRoutes,
   createPublicAuthRoutes,
 } from "./routes/auth";
+import { createCheckRoutes } from "./routes/checks";
 import {
   createApplicationImageRoutes,
   createImageRoutes,
@@ -28,6 +29,10 @@ import {
 } from "./routes/ocr";
 import { createUsageRoutes } from "./routes/usage";
 import { createAuthService } from "./services/auth";
+import {
+  type BusinessCheckService,
+  createBusinessCheckService,
+} from "./services/business-check";
 import {
   createImageStorage,
   type ImageStorage,
@@ -93,6 +98,7 @@ export function createApp(
   providedRepository?: TenantRepository,
   providedOcrPipeline?: OcrPipeline,
   providedImageStorage?: ImageStorage,
+  providedBusinessCheck?: BusinessCheckService,
 ): Hono<AppHonoEnv> {
   const app = new Hono<AppHonoEnv>();
 
@@ -100,14 +106,12 @@ export function createApp(
     const trace = providedTrace ?? createOperationTrace(context.req.raw);
     const repository =
       providedRepository ?? createTenantRepository(env.DB, trace);
+    const usage = createUsageService({ config, database: env.DB, trace });
     context.set("config", config);
     context.set("trace", trace);
     context.set("repository", repository);
     context.set("auth", createAuthService({ config, repository }));
-    context.set(
-      "usage",
-      createUsageService({ config, database: env.DB, trace }),
-    );
+    context.set("usage", usage);
     context.set(
       "ocrPipeline",
       providedOcrPipeline ??
@@ -121,6 +125,17 @@ export function createApp(
           accountId: config.r2AccountId,
           bucket: env.BUCKET,
           secretAccessKey: env.R2_S3_SECRET_ACCESS_KEY,
+        }),
+    );
+    context.set(
+      "businessCheck",
+      providedBusinessCheck ??
+        createBusinessCheckService({
+          apiKey: env.GEMINI_API_KEY,
+          config,
+          repository,
+          trace,
+          usage,
         }),
     );
     try {
@@ -162,6 +177,7 @@ export function createApp(
   protectedApi.route("/auth", createProtectedAuthRoutes());
   protectedApi.route("/usage", createUsageRoutes());
   protectedApi.route("/ocr", createOcrRoutes());
+  protectedApi.route("/checks", createCheckRoutes());
   protectedApi.route("/images", createImageRoutes());
   // `/applications/:id/image` のみここで登録する。Task 010 で `/api/applications` の
   // 残りのCRUDを追加する際、api.md の登録順序の注意（:id より前に具体パスを置く）に従う。

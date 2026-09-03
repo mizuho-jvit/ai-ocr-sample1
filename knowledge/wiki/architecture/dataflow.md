@@ -106,7 +106,7 @@ sequenceDiagram
 
 ## AI業務チェックと名寄せ（F-3・F-6）
 
-名寄せは**2段階**であり、**第1段では AI を呼ばない**（F-6-12）。会員全件を AI へ渡す方式は採用しない（F-6-6）。
+名寄せは**2段階**であり、**どちらの段も AI を呼ばない**（F-6-12）。会員の個人情報（氏名・カナ・生年月日・電話番号）を AI へ渡す方式は採用しない（F-6-6・[決定#27](../requirements/decisions.md)）。
 
 ```mermaid
 sequenceDiagram
@@ -130,10 +130,11 @@ sequenceDiagram
         W->>N: 抽出項目を渡す
         N->>N: 正規化<br/>旧字体・NFKC・カナ・和暦・電話
         N->>D1: 会員を照合<br/>tenantId + nameNormalized / kanaNormalized / phone
-        N-->>W: 上位5件の候補<br/>AIトークンは消費しない
+        N->>N: スコア内訳から同一人物の可能性を算出（決定#27）<br/>AIトークンは消費しない
+        N-->>W: 上位5件の候補＋可能性・理由
         W->>D1: UsageCounter を条件付き UPDATE
-        W->>AI: Pass② 整合性・不備・トリアージ・差戻し文面<br/>＋ 絞り込んだ候補のみ
-        AI-->>W: CheckResult ＋ 同一人物の可能性
+        W->>AI: Pass② 整合性・不備・トリアージ・差戻し文面<br/>（申請データのみ。会員の個人情報は渡さない）
+        AI-->>W: CheckResult
         W->>D1: INSERT CheckRun / UPSERT MatchCandidate
         Note over W,D1: rejected 済みの組み合わせは<br/>候補として再提示しない
         W-->>U: 200 RunCheckResponse
@@ -145,13 +146,13 @@ sequenceDiagram
 | `approved`（承認）済みでは実施不可 | F-4-6 |
 | 再実施回数の上限 | NF-2-21（MVP は 5回） |
 | `received`（受付）→ `under_review`（審査中）の自動遷移 | F-4-7 |
-| 第1段は決定的・AI不使用 | F-6-1・F-6-3・F-6-12 |
+| 第1段・第2段とも決定的・AI不使用 | F-6-1・F-6-3・F-6-5・F-6-12・[決定#27](../requirements/decisions.md) |
 | 照合は `tenantId` を先頭列とする複合インデックス | data-model.md・NF-5-13 |
-| 上位5件のみ AI へ | F-6-4・F-6-5・F-6-6 |
+| 上位5件のみ可能性判定の対象（会員の個人情報はAIへ渡さない） | F-6-4・F-6-5・F-6-6・決定#27 |
 | 実行結果を履歴として保存 | F-3-7・F-4-8 |
 | `rejected` を再提示しない | F-6-10 |
 
-> **`rejected` は AI へ渡す候補からも除外する。** 除外を UI 側だけで行うと、AIトークンを消費して「別人と判断済み」の候補を毎回再評価することになる。
+> **`rejected` は候補生成の対象からも除外する。** 除外を UI 側だけで行うと、業務チェックを再実施するたびに「別人と判断済み」の組み合わせが `MatchCandidate` へ再登録され続ける。
 
 ### 職員の判断（F-6-8）
 

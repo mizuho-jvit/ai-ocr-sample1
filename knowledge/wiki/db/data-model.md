@@ -26,7 +26,7 @@ timestamp: 2026-08-27T00:00:00Z
 | 会員状態 `MemberStatus` | `pending` / `active` / `suspended` / `inactive` | 申請中 / 利用資格あり / 停止中 / 退会 |
 | AIトリアージ `Triage` | `approval_candidate` / `needs_review` / `return_candidate` | 承認候補 / 要審査 / 差戻し候補 |
 | AI可能性 `Likelihood` | `high` / `medium` / `low` | 高 / 中 / 低 |
-| 名寄せ判断 `MatchStatus` | `pending` / `merged` / `rejected` / `hold` | 未判断 / 同一人物 / 別人 / 保留 |
+| 名寄せ判断 `MatchStatus` | `pending` / `merged` / `rejected` / `hold` / `stale` | 未判断 / 同一人物 / 別人 / 保留 / （非表示・内部状態） |
 
 各列は Drizzle の型だけに任せず、対応する値集合の `CHECK` 制約を持つ。履歴テーブルの `fromStatus` / `toStatus` も、対象テーブルと同じ値集合に制限する。状態遷移の可否はサービス層で検証し、状態更新と履歴の追加を同一トランザクションで実行する。
 
@@ -263,6 +263,7 @@ DTO 側（[types.md](../architecture/types.md)）の `processedBy` / `lastEdited
 | imageKey | TEXT | R2オブジェクトキー `{tenantId}/{applicationId}.{ext}`（NF-5-21）・NULL可 |
 | appStatus | TEXT | `received` \| `under_review` \| `approved` \| `returned`（既定 `received`）。表示ラベルは[状態値の永続化](#状態値の永続化) |
 | latestCheckRunId | TEXT | 最新の業務チェック結果への参照・NULL可 |
+| checkRunCount | INTEGER | **既定 0。** 業務チェック（Pass②）の実施回数を数える予約カウンタ。`CheckRun`行の実数ではなくこの列がNF-2-21の判定値になる（詳細は[CheckRun](#checkrun--業務チェック実行結果)） |
 | editedCount | INTEGER | **既定 0** |
 | processingSec | REAL | |
 | memberId | TEXT | → Member・NULL可（紐付け後に設定） |
@@ -294,6 +295,8 @@ DTO 側（[types.md](../architecture/types.md)）の `processedBy` / `lastEdited
 
 > **追記専用。行を書き換えない**ため `updatedAt` / `updatedById` を持たない（[監査列](#監査列)）。再実施は新しい行として記録する（F-4-8）。
 
+> **上限判定は本テーブルの件数を数えてから行わない。** `Application.checkRunCount` への**単一の条件付きUPDATE**（`WHERE id = ? AND checkRunCount < ?`）で、AI呼び出しの**前**に予約する（UsageCounterのNF-2-39と同じ規律）。読み取ってから判定する実装では、上限直前の並行リクエストが両方とも判定を通過してしまう。この予約はCheckRun行の作成より前に確定するため、予約後にAI呼び出しが失敗した場合（`USAGE_LIMIT_EXCEEDED`・`AI_UNAVAILABLE`等）は`checkRunCount`だけが加算されCheckRun行が作られない状態になりうる（fail closed側に倒す設計。NF-2-39がUsageCounterに持つのと同じ既知の限界）。
+
 ## MatchCandidate — 名寄せ候補と判断結果
 
 | カラム | 型 | 備考 |
@@ -303,17 +306,19 @@ DTO 側（[types.md](../architecture/types.md)）の `processedBy` / `lastEdited
 | applicationId | TEXT | → Application |
 | memberId | TEXT | → Member |
 | ruleScore | REAL | 第1段スコア |
-| aiLikelihood | TEXT | `high` \| `medium` \| `low`・NULL可。表示ラベルは[状態値の永続化](#状態値の永続化) |
-| aiReason | TEXT | NULL可 |
-| status | TEXT | `pending` \| `merged` \| `rejected` \| `hold`（既定 `pending`） |
+| aiLikelihood | TEXT | `high` \| `medium` \| `low`・NULL可。表示ラベルは[状態値の永続化](#状態値の永続化)。**値はAIではなくルールベースのロジックが算出する**（[決定#27](../requirements/decisions.md)）。列名は歴史的名称として維持する |
+| aiReason | TEXT | NULL可。同上、値はルールベースのロジックが生成する |
+| status | TEXT | `pending` \| `merged` \| `rejected` \| `hold` \| `stale`（既定 `pending`） |
 | decidedById | TEXT | → StaffUser・NULL可 |
 | decidedAt | DATETIME | NULL可 |
 | createdAt | DATETIME | 候補が最初に算出された時刻 |
-| updatedAt | DATETIME | **再実施による `ruleScore` / `aiLikelihood` の更新時刻**（[監査列](#監査列)） |
+| updatedAt | DATETIME | **再実施による `ruleScore` / `aiLikelihood` / `status` の更新時刻**（[監査列](#監査列)） |
 
 **UNIQUE(applicationId, memberId)** — 業務チェック再実施時に同一組み合わせが重複登録されるのを防ぐ。再実施時は既存レコードの `ruleScore` / `aiLikelihood` を更新し、`status` が `rejected` のものは候補として再提示しない（F-6-10）。
 
 > ここは `tenantId` を**制約に含めない**。`applicationId` は `Application` の PK であり全テナントで一意のため、先頭に付けても制約が緩むだけで意味がない。`tenantId` 列自体は他テーブルと同様に保持し、クエリ条件の対象にもなる（テナント分離を例外なく一律に適用するため）。
+
+> **`stale`（コードレビュー指摘#5）** — 業務チェックは何度でも再実施でき（NF-2-21の上限まで）、そのたびに`findMatchCandidates`が現在の申請データで上位5件を再計算する。編集後の再実施で前回の候補が今回の上位5件から外れることがあるが、`pending`/`hold`の行を**削除しない**。`hold`は職員が「保留」を選んだ判断記録（F-6-9・`decidedById`/`decidedAt`）であり、削除すると監査証跡が失われるため。代わりに`status`を`stale`へ更新し、候補カード一覧（`buildMatchCandidateViews`）からは`rejected`と同様に除外する。後の再実施でその会員が再び上位5件に戻った場合は、`stale`のまま固定せず`pending`へ戻す（F-6-8の判断をやり直せるようにする）。`merged`/`rejected`はこの無効化の対象外（`merged`は確定済みの紐付け、`rejected`はF-6-10によりそもそも`findMatchCandidates`のスコアリング対象から除外済み）。
 
 ## AppStatusHistory — 申請ステータス変更履歴
 

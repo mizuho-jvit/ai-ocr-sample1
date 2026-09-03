@@ -26,7 +26,7 @@ const MEMBER_STATUS_VALUES = "'pending', 'active', 'suspended', 'inactive'";
 const TRIAGE_VALUES =
   "'approval_candidate', 'needs_review', 'return_candidate'";
 const LIKELIHOOD_VALUES = "'high', 'medium', 'low'";
-const MATCH_STATUS_VALUES = "'pending', 'merged', 'rejected', 'hold'";
+const MATCH_STATUS_VALUES = "'pending', 'merged', 'rejected', 'hold', 'stale'";
 
 const createdAt = (name = "created_at") =>
   text(name).notNull().default(sql`CURRENT_TIMESTAMP`);
@@ -160,6 +160,12 @@ export const applications = sqliteTable(
     latestCheckRunId: text("latest_check_run_id")
       .$type<CheckRunId>()
       .references((): AnySQLiteColumn => checkRuns.id),
+    /**
+     * 🔵 Intent: コードレビュー指摘#3（Task 009）。NF-2-21の1申請あたりのCheckRun上限を
+     * 「件数を数えてから判定する」実装ではなく、usage_counter（NF-2-39）と同じ単一の
+     * 条件付きUPDATEで原子的に予約するためのカウンタ。
+     */
+    checkRunCount: integer("check_run_count").notNull().default(0),
     editedCount: integer("edited_count").notNull().default(0),
     processingSec: real("processing_sec").notNull(),
     memberId: text("member_id")

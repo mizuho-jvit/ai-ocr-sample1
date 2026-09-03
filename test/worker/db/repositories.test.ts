@@ -135,6 +135,52 @@ describe("TenantRepository", () => {
   });
 });
 
+describe("runTransaction", () => {
+  it("commits every operation together when all succeed", async () => {
+    const repository = createTenantRepository(env.DB);
+    const tenantA = repository.forTenant(TENANT_A);
+    const memberId = toMemberId("member-batch-commit");
+
+    await tenantA.runTransaction([
+      tenantA.members.prepareInsert(
+        memberValues(memberId, "batch-commit", "一括登録"),
+      ),
+      tenantA.members.prepareUpdate(
+        { status: "inactive" },
+        whereFieldEquals("members", "id", memberId),
+      ),
+    ]);
+
+    const stored = await tenantA.members.findOne(
+      whereFieldEquals("members", "id", memberId),
+    );
+    expect(stored).toMatchObject({ id: memberId, status: "inactive" });
+  });
+
+  it("rolls back every operation when one of them fails (コードレビュー指摘#2)", async () => {
+    const repository = createTenantRepository(env.DB);
+    const tenantA = repository.forTenant(TENANT_A);
+    const memberId = toMemberId("member-batch-rollback");
+
+    await expect(
+      tenantA.runTransaction([
+        tenantA.members.prepareInsert(
+          memberValues(memberId, "batch-rollback", "一括登録失敗"),
+        ),
+        // 同じidで再度insertし、PRIMARY KEY制約違反でバッチ全体を失敗させる。
+        tenantA.members.prepareInsert(
+          memberValues(memberId, "batch-rollback-dup", "一括登録失敗"),
+        ),
+      ]),
+    ).rejects.toThrow();
+
+    const stored = await tenantA.members.findOne(
+      whereFieldEquals("members", "id", memberId),
+    );
+    expect(stored).toBeNull();
+  });
+});
+
 function memberValues(id: MemberId, memberNumber: string, name: string) {
   return {
     address: null,

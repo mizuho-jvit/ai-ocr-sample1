@@ -5,10 +5,12 @@ import {
 import type { members } from "../db/schema";
 import type {
   ApplicationId,
+  Likelihood,
   MemberStatus,
   MemberSummary,
   RuleScoreBreakdown,
 } from "../types";
+import { SCORE_WEIGHTS } from "./matching-constants";
 import type { NormalizedMemberIdentity } from "./member-normalizer";
 
 /**
@@ -27,19 +29,11 @@ export interface RuleMatchCandidate {
   member: MemberSummary;
   ruleScore: number;
   breakdown: RuleScoreBreakdown;
+  likelihood: Likelihood;
+  reason: string;
 }
 
 type MemberRow = typeof members.$inferSelect;
-
-/**
- * 🔴 Intent: F-6-3は条件の分類（高スコア2種・中スコア1種）のみを定め、具体的な重みは
- * 要件に明記がない。NF-4-3に従い定数として一元管理し、高スコア2条件を同じ重みにする。
- */
-const SCORE_WEIGHTS = {
-  kanaAndBirthDate: 60,
-  name: 30,
-  phone: 60,
-} as const;
 
 const MAX_CANDIDATES = 5;
 
@@ -70,6 +64,35 @@ function scoreMember(
     (name ? SCORE_WEIGHTS.name : 0);
 
   return { kanaAndBirthDate, name, phone, total };
+}
+
+/**
+ * 🔵 Intent: 決定#27によりF-6-5の「同一人物の可能性」はAIではなくルールベースで判定する
+ * （既存会員の個人情報をAIへ送信しないため）。「高スコア」条件（カナ+生年月日一致・
+ * 電話番号一致）が2つとも成立→high、いずれか1つのみ→medium、正規化後氏名一致のみ→low。
+ */
+function classifyLikelihood(breakdown: RuleScoreBreakdown): Likelihood {
+  const strongMatchCount =
+    Number(breakdown.kanaAndBirthDate) + Number(breakdown.phone);
+  if (strongMatchCount >= 2) {
+    return "high";
+  }
+  return strongMatchCount === 1 ? "medium" : "low";
+}
+
+/** 🔵 Intent: 決定#27。classifyLikelihoodと同じ内訳から、根拠を示す定型文を組み立てる。 */
+function describeLikelihoodReason(breakdown: RuleScoreBreakdown): string {
+  const matchedConditions: string[] = [];
+  if (breakdown.kanaAndBirthDate) {
+    matchedConditions.push("カナ氏名と生年月日");
+  }
+  if (breakdown.phone) {
+    matchedConditions.push("電話番号");
+  }
+  if (breakdown.name) {
+    matchedConditions.push("氏名（正規化後）");
+  }
+  return `${matchedConditions.join("・")}が一致しているため。`;
 }
 
 function toMemberSummary(member: MemberRow): MemberSummary {
@@ -133,8 +156,9 @@ async function candidateRowsForConditions(
 }
 
 /**
- * 🔵 Intent: AIを呼ばずテナント内会員だけを決定的にスコアリングする（F-6-3・F-6-4・F-6-12）。
- * このapplicationIdに対してrejected済みの組み合わせは候補から除外する（F-6-10）。
+ * 🔵 Intent: AIを呼ばずテナント内会員だけを決定的にスコアリングし、同一人物の可能性も
+ * ルールベースで判定する（F-6-3・F-6-4・F-6-5・F-6-12・決定#27）。会員の個人情報はここから
+ * 外部へ送信しない。このapplicationIdに対してrejected済みの組み合わせは候補から除外する（F-6-10）。
  */
 export async function findMatchCandidates(
   scope: TenantScope,
@@ -171,7 +195,9 @@ export async function findMatchCandidates(
 
   return scored.slice(0, MAX_CANDIDATES).map((entry) => ({
     breakdown: entry.breakdown,
+    likelihood: classifyLikelihood(entry.breakdown),
     member: toMemberSummary(entry.member),
+    reason: describeLikelihoodReason(entry.breakdown),
     ruleScore: entry.breakdown.total,
   }));
 }

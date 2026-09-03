@@ -15,6 +15,20 @@
       "when": 1788339220306,
       "tag": "0001_friendly_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788418452390,
+      "tag": "0002_wet_vulcan",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788424687846,
+      "tag": "0003_tearful_jane_foster",
+      "breakpoints": true
     }
   ]
 }

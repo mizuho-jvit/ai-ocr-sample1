@@ -286,6 +286,68 @@ describe("findMatchCandidates — scoring (F-6-3・F-6-4)", () => {
   });
 });
 
+describe("findMatchCandidates — 同一人物の可能性判定 (F-6-5・決定#27)", () => {
+  it("classifies as high when both strong conditions match (kana+birthDate and phone)", async () => {
+    const memberId = await insertMember({
+      birthDate: "1980-01-01",
+      name: "仙台 一郎",
+      nameKana: "センダイ イチロウ",
+      phone: "0300003333",
+    });
+
+    const input = normalizeMemberInput({
+      birthDate: "1980-01-01",
+      name: "別人 太郎",
+      nameKana: "せんだい いちろう",
+      phone: "0300003333",
+    });
+
+    const result = await findMatchCandidates(scope(), input);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.member.id).toBe(memberId);
+    expect(result[0]?.likelihood).toBe("high");
+    expect(result[0]?.reason).toContain("カナ氏名と生年月日");
+    expect(result[0]?.reason).toContain("電話番号");
+  });
+
+  it("classifies as medium when exactly one strong condition matches (phone only)", async () => {
+    await insertMember({ name: "無関係", phone: "0300002222" });
+
+    const input = normalizeMemberInput({
+      birthDate: null,
+      name: "別の名前",
+      nameKana: null,
+      phone: "03-0000-2222",
+    });
+
+    const result = await findMatchCandidates(scope(), input);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.likelihood).toBe("medium");
+  });
+
+  it("classifies as low when only the normalized name matches", async () => {
+    await insertMember({
+      address: "宮城県仙台市青葉区中央1丁目",
+      name: "青葉 花子",
+    });
+
+    const input = normalizeMemberInput({
+      birthDate: null,
+      name: "青葉 花子",
+      nameKana: null,
+      phone: null,
+    });
+
+    const result = await findMatchCandidates(scope(), input);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.likelihood).toBe("low");
+    expect(result[0]?.reason).toBe("氏名（正規化後）が一致しているため。");
+  });
+});
+
 describe("findMatchCandidates — top 5 cap (F-6-4)", () => {
   it("returns at most 5 candidates even when more members match", async () => {
     const sharedPhone = "0300005555";

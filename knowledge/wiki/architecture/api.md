@@ -160,7 +160,7 @@ SPA の初期化時に必ず呼び、`401` ならログイン画面へリダイ�
 - Gemini 呼び出し回数のカウンタも加算対象（Pass①・Pass②の合算・NF-2-17・NF-2-34）。上限到達は `429`
 - **`received`（受付）の申請は自動的に `under_review`（審査中）へ遷移する**（F-4-7）。遷移は `AppStatusHistory` に記録する
 - 結果は新たな `CheckRun` として記録し（F-4-8）、`Application.latestCheckRunId` を更新する
-- 名寄せは第1段（AI呼び出しなし・F-6-12）→ 第2段（候補のみAIへ・F-6-5）の順。`rejected` 済みの組み合わせは再提示しない（F-6-10）
+- 名寄せは第1段（決定的スコアリング・F-6-12）→ 第2段（スコア内訳からのルールベース可能性判定・F-6-5・[決定#27](../requirements/decisions.md)）の順。**どちらもAIを呼ばず、既存会員の個人情報を送信しない。** `rejected` 済みの組み合わせは再提示しない（F-6-10）
 - 既存の `MatchCandidate` は `UNIQUE(applicationId, memberId)` により重複登録されず、`ruleScore` / `aiLikelihood` を更新する
 
 ## 申請管理（F-4）

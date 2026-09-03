@@ -5,6 +5,7 @@ import {
   type TenantScopedExecutor,
 } from "../../../src/worker/db/tenant-scoped-db";
 import {
+  type ScopedWriteOp,
   type SqlExpr,
   type TenantInsertValues,
   type TenantRow,
@@ -22,8 +23,15 @@ const TENANT_B = toTenantId("tenant-b");
 
 function createExecutor(): TenantScopedExecutor {
   return {
+    batch: vi.fn(async () => undefined),
     delete: vi.fn(async () => 1),
     insert: vi.fn(async (_table, values) => values),
+    prepareInsert: vi.fn(
+      (_table, values) => values as unknown as ScopedWriteOp,
+    ),
+    prepareUpdate: vi.fn(
+      (_table, values) => values as unknown as ScopedWriteOp,
+    ),
     select: vi.fn(async () => []),
     selectOne: vi.fn(async () => null),
     update: vi.fn(async () => 1),

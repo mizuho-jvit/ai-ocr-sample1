@@ -31,11 +31,16 @@ export type MemberStatus = 'pending' | 'active' | 'suspended' | 'inactive';
 /** AIのトリアージ判定。決裁状態を自動変更しない参考情報（F-3-4・F-4-1） */
 export type Triage = 'approval_candidate' | 'needs_review' | 'return_candidate';
 
-/** 名寄せ第2段のAI判定（F-6-5） */
+/** 名寄せ第2段のルールベース判定（F-6-5・決定#27。AIは使用しない） */
 export type Likelihood = 'high' | 'medium' | 'low';
 
-/** 名寄せ候補に対する職員の判断結果（F-6-8・F-6-9） */
-export type MatchStatus = 'pending' | 'merged' | 'rejected' | 'hold';
+/**
+ * 名寄せ候補に対する職員の判断結果（F-6-8・F-6-9）。
+ * `stale`は職員の判断ではなく、業務チェック再実施のたびに今回の上位5件から
+ * 外れた`pending`/`hold`候補をシステムが無効化するための内部状態
+ * （コードレビュー指摘#5・data-model.md「MatchCandidate」参照）。
+ */
+export type MatchStatus = 'pending' | 'merged' | 'rejected' | 'hold' | 'stale';
 
 /** 整合性検証の重要度（F-3-1） */
 export type Severity = 'error' | 'warning';
@@ -201,7 +206,7 @@ export interface MatchCandidateView {
   member: MemberSummary;
   /** 第1段スコア */
   ruleScore: number;
-  /** 第2段。第2段未実行なら null（F-6-5） */
+  /** 第2段（ルールベース判定、決定#27）。値はAI由来ではないが列・フィールド名は維持する */
   aiLikelihood: Likelihood | null;
   aiReason: string | null;
   status: MatchStatus;
@@ -415,8 +420,11 @@ export interface RunCheckResponse {
 
 ```ts
 export interface DecideMatchRequest {
-  /** merged=同一人物として紐付け / rejected=別人 / hold=保留 */
-  decision: Exclude<MatchStatus, 'pending'>;
+  /**
+   * merged=同一人物として紐付け / rejected=別人 / hold=保留。
+   * `stale`はシステム内部状態のため職員が選べる決定には含めない。
+   */
+  decision: Exclude<MatchStatus, 'pending' | 'stale'>;
 }
 
 export interface DecideMatchResponse {

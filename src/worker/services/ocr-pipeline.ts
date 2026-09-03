@@ -7,6 +7,10 @@ import {
   type OcrPipelineMode,
   type PreparedImage,
 } from "../types";
+import {
+  OCR_EXTRACT_RESPONSE_SCHEMA,
+  OCR_EXTRACT_SYSTEM_INSTRUCTION,
+} from "./ai-prompts";
 import { createGeminiClient } from "./gemini-client";
 
 export interface OcrPipelineConfig {
@@ -22,46 +26,6 @@ export interface OcrPipelineOptions {
   readonly requestFetch?: typeof fetch;
   readonly trace?: OperationTrace;
 }
-
-/**
- * 🔴 Intent: F-2-4・F-2-7に基づくプロンプト。事務局記入欄の除外と空欄の扱いは
- * 前工程（functional.md）の記述に沿うが、文面自体は前工程に指定が無いためAIが補完した。
- */
-const EXTRACT_SYSTEM_INSTRUCTION = `あなたは日本語の紙帳票を読み取るOCRアシスタントです。
-入力された1枚の帳票画像から、次のJSONスキーマに従って情報を抽出してください。
-
-- docType: 帳票の種類を判別する（例:「利用者登録申請書」）。
-- fields: 申請者記入欄の項目をラベルと値のペアで、記載されている順にすべて抽出する。
-  - 空欄の項目も除外せず、value を空文字列として含める。
-  - 「使用欄」「事務局記入欄」「受理番号」等、職員が記入する欄は fields に含めない。
-  - 各項目に 0 以上 1 以下の確信度 confidence を付与する。
-
-推測で値を作らず、判読できない場合は confidence を低くしてください。`;
-
-/**
- * 🟡 Intent: Gemini Structured OutputsのresponseSchemaはGoogle Generative Language APIの
- * Schema表現(型名は大文字の列挙値)に従う。ネットワーク制限によりライブのAPIドキュメントで
- * 検証できていないため、実際のGemini応答で確認が必要(要人手確認)。
- */
-const EXTRACTED_APPLICATION_SCHEMA = {
-  properties: {
-    docType: { type: "STRING" },
-    fields: {
-      items: {
-        properties: {
-          confidence: { type: "NUMBER" },
-          label: { type: "STRING" },
-          value: { type: "STRING" },
-        },
-        required: ["label", "value", "confidence"],
-        type: "OBJECT",
-      },
-      type: "ARRAY",
-    },
-  },
-  required: ["docType", "fields"],
-  type: "OBJECT",
-};
 
 function aiUnavailable(): ApiErrorException {
   return new ApiErrorException("AI_UNAVAILABLE");
@@ -120,8 +84,8 @@ function createGeminiPipeline(options: OcrPipelineOptions): OcrPipeline {
     async extract(image: PreparedImage): Promise<ExtractedApplication> {
       const raw = await client.generateStructured({
         image: { base64: image.base64, mimeType: image.mimeType },
-        responseSchema: EXTRACTED_APPLICATION_SCHEMA,
-        systemInstruction: EXTRACT_SYSTEM_INSTRUCTION,
+        responseSchema: OCR_EXTRACT_RESPONSE_SCHEMA,
+        systemInstruction: OCR_EXTRACT_SYSTEM_INSTRUCTION,
         trace: options.trace,
       });
       return validateExtractedApplication(raw);

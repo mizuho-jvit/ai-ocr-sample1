@@ -1,7 +1,9 @@
 import type { OperationTrace } from "../observability/operation-trace";
 import type {
   AppConfig,
+  ApplicationId,
   ScopedDb,
+  ScopedWriteOp,
   SqlExpr,
   StaffUserId,
   TenantId,
@@ -9,10 +11,12 @@ import type {
   TenantScopedTable,
 } from "../types";
 import {
+  type CheckRunReservation,
   clearExpiredLoginLock,
   createScopedDatabase,
   type LoginFailureState,
   registerLoginFailure,
+  reserveCheckRunSlot,
   tenantIds,
   whereEquals,
 } from "./client";
@@ -39,6 +43,19 @@ export interface TableRepository<
   insert(values: WithoutTenant<Insert>): Promise<Row>;
   update(values: Partial<WithoutTenant<Row>>, where: SqlExpr): Promise<number>;
   delete(where: SqlExpr): Promise<number>;
+  /**
+   * `insert`と同じ書き込みを、実行せず`TenantScopedRepositories.runTransaction`へ
+   * 渡すためだけに構築する。
+   */
+  prepareInsert(values: WithoutTenant<Insert>): ScopedWriteOp;
+  /**
+   * `update`と同じ書き込みを、実行せず`TenantScopedRepositories.runTransaction`へ
+   * 渡すためだけに構築する。
+   */
+  prepareUpdate(
+    values: Partial<WithoutTenant<Row>>,
+    where: SqlExpr,
+  ): ScopedWriteOp;
 }
 
 /**
@@ -60,6 +77,22 @@ export interface StaffUserRepository
   ): Promise<LoginFailureState | null>;
 }
 
+/**
+ * 🔵 Intent: コードレビュー指摘#3（Task 009）。NF-2-21のCheckRun上限を
+ * 「件数を数えてから判定する」実装ではなく、`applications.checkRunCount`への
+ * 単一の条件付きUPDATEで原子的に予約するために追加する。
+ */
+export interface ApplicationRepository
+  extends TableRepository<
+    typeof applications.$inferSelect,
+    typeof applications.$inferInsert
+  > {
+  reserveCheckRunSlot(
+    applicationId: ApplicationId,
+    limit: number,
+  ): Promise<CheckRunReservation | null>;
+}
+
 interface RepositoryContext {
   readonly database: D1Database;
   readonly tenantId: TenantId;
@@ -67,10 +100,7 @@ interface RepositoryContext {
 }
 
 export interface TenantScopedRepositories {
-  readonly applications: TableRepository<
-    typeof applications.$inferSelect,
-    typeof applications.$inferInsert
-  >;
+  readonly applications: ApplicationRepository;
   readonly appStatusHistory: TableRepository<
     typeof appStatusHistory.$inferSelect,
     typeof appStatusHistory.$inferInsert
@@ -96,6 +126,12 @@ export interface TenantScopedRepositories {
     typeof statusHistory.$inferSelect,
     typeof statusHistory.$inferInsert
   >;
+  /**
+   * 🔵 Intent: コードレビュー指摘#2（Task 009）。複数テーブルへの書き込みを
+   * `table.prepareInsert`/`prepareUpdate`で構築だけしておき、ここへまとめて渡すと
+   * D1の単一トランザクション（`ScopedDb.batch`）として全成功/全失敗になる。
+   */
+  runTransaction(operations: readonly ScopedWriteOp[]): Promise<void>;
 }
 
 export interface TenantRepository {
@@ -127,8 +163,35 @@ function tableRepository<Row extends TenantRow, Insert extends TenantRow>(
         table,
         values as unknown as WithoutTenant<Row>,
       ),
+    prepareInsert: (values: WithoutTenant<Insert>) =>
+      scopedDatabase.prepareInsert<Row>(
+        table,
+        values as unknown as WithoutTenant<Row>,
+      ),
+    prepareUpdate: (values: Partial<WithoutTenant<Row>>, where: SqlExpr) =>
+      scopedDatabase.prepareUpdate<Row>(table, values, where),
     update: (values: Partial<WithoutTenant<Row>>, where: SqlExpr) =>
       scopedDatabase.update<Row>(table, values, where),
+  });
+}
+
+function applicationRepository(
+  scopedDatabase: ScopedDb,
+  context: RepositoryContext,
+): ApplicationRepository {
+  return Object.freeze({
+    ...tableRepository<
+      typeof applications.$inferSelect,
+      typeof applications.$inferInsert
+    >(scopedDatabase, "applications"),
+    reserveCheckRunSlot: (applicationId: ApplicationId, limit: number) =>
+      reserveCheckRunSlot(
+        context.database,
+        context.tenantId,
+        applicationId,
+        limit,
+        context.trace,
+      ),
   });
 }
 
@@ -171,10 +234,7 @@ function scopedRepositories(
   context: RepositoryContext,
 ): TenantScopedRepositories {
   return Object.freeze({
-    applications: tableRepository<
-      typeof applications.$inferSelect,
-      typeof applications.$inferInsert
-    >(scopedDatabase, "applications"),
+    applications: applicationRepository(scopedDatabase, context),
     appStatusHistory: tableRepository<
       typeof appStatusHistory.$inferSelect,
       typeof appStatusHistory.$inferInsert
@@ -195,6 +255,8 @@ function scopedRepositories(
       typeof sessions.$inferSelect,
       typeof sessions.$inferInsert
     >(scopedDatabase, "sessions"),
+    runTransaction: (operations: readonly ScopedWriteOp[]) =>
+      scopedDatabase.batch(operations),
     staffUsers: staffUserRepository(scopedDatabase, context),
     statusHistory: tableRepository<
       typeof statusHistory.$inferSelect,
