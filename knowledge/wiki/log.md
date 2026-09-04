@@ -4,6 +4,12 @@
 
 ## 2026-09-04
 
+### 名寄せ候補カードがOCRラベルの表記ゆれを拾えない欠陥を修正した（Task 023・決定#38・コードレビュー指摘#6）
+
+- **申請詳細画面の名寄せ候補カード（`match-candidate-card.tsx`）の「氏名カナ」「電話番号」行が、OCRラベルが「フリガナ」「電話」等の別表記だと申請データ側を空欄表示にし、実際は一致している値を不一致ハイライトしていた欠陥を修正した。** 名寄せ判定（`business-check.ts`）は決定#26の表記ゆれ辞書を使って正しく候補を抽出できていたが、それを画面に見せる側だけがラベルの完全一致1本で申請データを探しており、判定結果と画面表示が食い違っていた。
+- **表記ゆれ辞書（`NAME_LABELS`等）と判定関数`findFieldValueByLabels`を`src/shared/field-label-aliases.ts`へ切り出し、`business-check.ts`と`match-candidate-card.tsx`の両方から参照するようにした。** これまで「SPAからWorkerの型は`import type`でのみ共有し、実行時コードは持ち込まない」という境界（`context.md`）があったため、外部I/O・Cloudflare依存を一切持たない純粋データ・純粋関数のみで構成する場合に限りSPAからの通常importを認める例外を新設した（決定#38）。`matching-constants.ts`にはWorker固有の`SCORE_WEIGHTS`のみを残した。
+- `vitest.config.ts`に`test/shared/**`用の3つ目のプロジェクトを追加し、`test/shared/field-label-aliases.test.ts`を新規追加した。`application-detail-page.test.tsx`に、別表記ラベルでも一致判定・表示が正しく行われることを確認するテストを追加した。`corepack pnpm test`（43ファイル・391テスト）/ `lint` / `tsc -b` / `build` で確認した。
+
 ### 申請ステータス変更ボタンを遷移先ステータスの色で塗り分けた（決定#37）
 
 - **「承認する」「差戻しにする」等のステータス変更ボタンが、実装ではすべて黒（`.btn-primary`）で統一されておりプロトタイプと見た目が異なるという指摘を受けた。** プロトタイプ`ai-ocr-demo.jsx`はボタンごとに遷移先ステータスの色（`APP_STATUS_COLOR`）でアウトライン表示しており、「差戻しにする」は朱色になる。

@@ -42,6 +42,12 @@ export default defineConfig(async () => {
             setupFiles: ["./test/react-app/test-setup.ts"],
           },
         },
+        {
+          test: {
+            include: ["test/shared/**/*.test.ts"],
+            name: "shared",
+          },
+        },
       ],
     },
   };

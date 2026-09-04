@@ -1,3 +1,10 @@
+import {
+  BIRTH_DATE_LABELS,
+  findFieldValueByLabels,
+  NAME_KANA_LABELS,
+  NAME_LABELS,
+  PHONE_LABELS,
+} from "../../shared/field-label-aliases";
 import type { TenantRepository } from "../db/repositories";
 import { whereFieldEquals } from "../db/repositories";
 import type { OperationTrace } from "../observability/operation-trace";
@@ -15,12 +22,6 @@ import type { SessionActor } from "./auth";
 import { runBusinessCheckAi } from "./business-check-ai";
 import { createGeminiClient } from "./gemini-client";
 import { findMatchCandidates } from "./matching";
-import {
-  BIRTH_DATE_LABELS,
-  NAME_KANA_LABELS,
-  NAME_LABELS,
-  PHONE_LABELS,
-} from "./matching-constants";
 import { type MemberIdentity, normalizeMemberInput } from "./member-normalizer";
 import type { UsageService } from "./usage";
 
@@ -40,24 +41,13 @@ export interface BusinessCheckServiceOptions {
   readonly requestFetch?: typeof fetch;
 }
 
-function findFieldValue(
-  fields: ApplicationField[],
-  labels: ReadonlySet<string>,
-): string | null {
-  const field = fields.find((candidate) => labels.has(candidate.label.trim()));
-  if (!field || field.value.trim().length === 0) {
-    return null;
-  }
-  return field.value;
-}
-
 /** 🔵 Intent: F-6の第1段（決定的正規化・findMatchCandidates）が要求するMemberIdentityへ変換する。 */
 function extractMemberIdentity(fields: ApplicationField[]): MemberIdentity {
   return {
-    birthDate: findFieldValue(fields, BIRTH_DATE_LABELS),
-    name: findFieldValue(fields, NAME_LABELS) ?? "",
-    nameKana: findFieldValue(fields, NAME_KANA_LABELS),
-    phone: findFieldValue(fields, PHONE_LABELS),
+    birthDate: findFieldValueByLabels(fields, BIRTH_DATE_LABELS),
+    name: findFieldValueByLabels(fields, NAME_LABELS) ?? "",
+    nameKana: findFieldValueByLabels(fields, NAME_KANA_LABELS),
+    phone: findFieldValueByLabels(fields, PHONE_LABELS),
   };
 }
 

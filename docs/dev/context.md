@@ -34,7 +34,7 @@
 
 **プロジェクトを分ける理由:** `cloudflareTest()` を全体へ適用するとSPAのテストもworkerd上で動きDOMが無いため描画テストが書けない。逆にSPA側へworkerdプールを適用しない限り、WorkerテストのD1・R2バインディングは得られない。`include` はディレクトリで完全に分離する。
 
-SPAからWorkerの型は `import type` でのみ共有する（`src/worker/types/contracts.ts`）。実行時コードはSPAへ持ち込まない。
+SPAからWorkerの型は `import type` でのみ共有する（`src/worker/types/contracts.ts`）。実行時コードはSPAへ持ち込まない。**唯一の例外は `src/shared/`。外部I/O・Cloudflare依存を一切持たない純粋データ・純粋関数（例: `field-label-aliases.ts` のOCRラベル表記ゆれ辞書）に限り、Worker・SPAの両方から通常importで参照してよい（決定#38）。** Worker固有の業務ロジック（`services/` 配下）はこの対象外。
 
 **テストは `test/` へ分離し、`src/` と同じディレクトリ構成をミラーする**（AGENTS.mdの規約）。importグラフに乗らないためビルド成果物には元々含まれないが、本体とテストのディレクトリを分けて見通しやすくする。
 
@@ -50,12 +50,13 @@ src/
 │   ├── api/auth.ts            # /api/auth/* クライアントと AuthApiError
 │   ├── components/            # auth-guard.tsx（認証シェル）/ app-shell.tsx（共通枠・メニュー）
 │   └── pages/login-page.tsx   # ログイン画面
-└── worker/
-    ├── index.ts               # Basic認証 → Hono → ASSETS.fetch
-    ├── db/schema.ts           # Drizzleの10テーブル定義
-    ├── routes/                # APIルート
-    ├── services/              # 業務ロジック
-    └── types/                 # SPA/Worker共有型
+├── worker/
+│   ├── index.ts               # Basic認証 → Hono → ASSETS.fetch
+│   ├── db/schema.ts           # Drizzleの10テーブル定義
+│   ├── routes/                # APIルート
+│   ├── services/              # 業務ロジック
+│   └── types/                 # SPA/Worker共有型
+└── shared/                    # SPA/Worker共有の純粋データ・純粋関数（決定#38。実行時コード共有の唯一の例外）
 test/                          # src/ と同じディレクトリ構成をミラーする（AGENTS.md）
 ├── react-app/
 │   ├── test-setup.ts          # Testing Library の cleanup 登録
@@ -166,5 +167,6 @@ Biomeは `src/**`、ルートの `*.ts` / `*.json`、`index.html` を対象に�
 - **Task 020(差戻し文面の編集・コピー)を実装済み。** 申請詳細画面の`CheckRun.letterDraft`は`src/react-app/components/letter-draft-editor.tsx`の`textarea`で編集し、「コピー」でクリップボードへ書き込む(F-3-5)。**編集内容はどこにも保存しない**(`CheckRun`は追記専用。決定#34)。再実施で`latestCheckRun.id`が変わると`key`で再マウントされ編集途中の内容は破棄される。クリップボード書き込みは`writeClipboard`プロップで注入でき、既定は`navigator.clipboard.writeText`(無い環境ではフォールバックせず失敗文言を出す)。
 - **Task 021(同一ラベル複数項目の編集修正)を実装済み。** `PATCH /api/applications/:id/fields`の`updateFields`は、同じラベルの項目が複数ある帳票で編集が壊れる欠陥(コードレビュー指摘#5)があった。ラベルだけの`Map`ではなくリクエストの並び順で1件ずつ消費する方式に変更した(決定#35)。`ocr-page.tsx`・`application-detail-page.tsx`のReactの`key`/HTMLの`id`も`field.label`から`index`へ変更した。
 - **Task 022(判子スタンプ・ステータスバッジ)を実装済み。** overview.md「判定表示｜判子風の円形スタンプ」がTask 007で「後続タスクの対象」のまま未実装だったのを解消した(決定#36)。`src/react-app/components/{triage-stamp,app-status-badge}.tsx`はプロトタイプ`ai-ocr-demo.jsx`の`TriageStamp`/`AppStatusBadge`を踏襲し、色は`theme.css`のCSSカスタムプロパティで対応付ける。申請詳細画面・申請状況一覧に配線済み。`TriageStamp`は`role="img"`+`aria-label`を持つため、囲むセルのアクセシブルネームが変わる(テストは`getByLabelText`で確認)。申請詳細画面のステータス変更ボタンも、統一の黒(`.btn-primary`)からプロトタイプ同様の遷移先ステータス色(`APP_STATUS_BADGE_COLOR`をエクスポートして再利用)へ変更した(決定#37。例:「差戻しにする」は朱色)。
+- **Task 023(名寄せ候補カードのOCRラベル別名対応)を実装済み。** 名寄せ判定(`business-check.ts`)は決定#26のOCRラベル表記ゆれ辞書(「フリガナ」等)で正しく候補を抽出できていたが、`match-candidate-card.tsx`の差分表示は「氏名カナ」「電話番号」の完全一致でしか申請データを探しておらず、判定結果と画面表示が食い違う欠陥(コードレビュー指摘#6)があった。表記ゆれ辞書と判定関数`findFieldValueByLabels`を`src/shared/field-label-aliases.ts`へ切り出し、Worker側・SPA側の両方から参照する形にした(決定#38)。`vitest.config.ts`に`test/shared/**`用の第3プロジェクトを追加した。
 - 次に着手できるのは Task 011（会員登録・編集。依存はすべて完了）。Task 007のR2ライフサイクル未設定はTask 015・016・018のみが依存関係として参照しており、011の着手は妨げない。012（スタッフ管理）・014（デモデータリセット）も依存は満たすが優先度は低い。
 - 詳細な要件は `knowledge/wiki/requirements/functional.md`、`knowledge/wiki/screens/screen-list.md`、`knowledge/wiki/architecture/api.md` を読む。

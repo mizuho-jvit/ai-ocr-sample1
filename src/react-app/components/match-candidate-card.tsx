@@ -1,3 +1,10 @@
+import {
+  BIRTH_DATE_LABELS,
+  findFieldValueByLabels,
+  NAME_KANA_LABELS,
+  NAME_LABELS,
+  PHONE_LABELS,
+} from "../../shared/field-label-aliases";
 import type {
   ApplicationDetail,
   ApplicationField,
@@ -6,9 +13,17 @@ import type {
 } from "../../worker/types/contracts";
 import { LIKELIHOOD_LABELS, MATCH_STATUS_LABELS } from "../labels";
 
-/** F-3-3・決定#26相当。F-5-2の項目名で申請データ側から名寄せ対象の値を拾う。 */
-function findFieldValue(fields: ApplicationField[], label: string): string {
-  return fields.find((field) => field.label === label)?.value ?? "";
+/**
+ * 🔵 Intent: コードレビュー指摘#6。バックエンドの名寄せ判定（business-check.ts）と同じ
+ * 表記ゆれ辞書（決定#26・#38）を使う。以前はラベル文字列の完全一致だけだったため、
+ * OCRが「フリガナ」等の別表記で抽出した項目を拾えず、実際は一致している値が
+ * 空欄・不一致ハイライトとして誤表示されていた。
+ */
+function findFieldValue(
+  fields: ApplicationField[],
+  labels: ReadonlySet<string>,
+): string {
+  return findFieldValueByLabels(fields, labels) ?? "";
 }
 
 interface DiffRowProps {
@@ -121,22 +136,22 @@ export function MatchCandidateCard({
           <div style={{ color: "var(--ink-soft)" }}>会員データ</div>
         </div>
         <DiffRow
-          applicantValue={findFieldValue(application.fields, "氏名")}
+          applicantValue={findFieldValue(application.fields, NAME_LABELS)}
           label="氏名"
           memberValue={candidate.member.name}
         />
         <DiffRow
-          applicantValue={findFieldValue(application.fields, "氏名カナ")}
+          applicantValue={findFieldValue(application.fields, NAME_KANA_LABELS)}
           label="氏名カナ"
           memberValue={candidate.member.nameKana ?? ""}
         />
         <DiffRow
-          applicantValue={findFieldValue(application.fields, "生年月日")}
+          applicantValue={findFieldValue(application.fields, BIRTH_DATE_LABELS)}
           label="生年月日"
           memberValue={candidate.member.birthDate ?? ""}
         />
         <DiffRow
-          applicantValue={findFieldValue(application.fields, "電話番号")}
+          applicantValue={findFieldValue(application.fields, PHONE_LABELS)}
           label="電話番号"
           memberValue={candidate.member.phone ?? ""}
         />

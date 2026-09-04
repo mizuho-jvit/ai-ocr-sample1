@@ -306,6 +306,64 @@ describe("ApplicationDetailPage", () => {
     });
   });
 
+  // コードレビュー指摘#6: バックエンドの名寄せ判定が認識する表記ゆれ(「フリガナ」「電話」等)を
+  // 候補カードの差分表示も同じ辞書で解決し、一致しているのに空欄・不一致扱いにしない。
+  it("resolves OCR label aliases (フリガナ・電話) when diffing against member data (コードレビュー指摘#6)", async () => {
+    const application = baseApplication({
+      fields: [
+        { confidence: 0.98, edited: false, label: "氏名", value: "山田太郎" },
+        {
+          confidence: 0.9,
+          edited: false,
+          label: "フリガナ",
+          value: "ヤマダタロウ",
+        },
+        { confidence: 0.9, edited: false, label: "電話", value: "0300001111" },
+      ],
+      matchCandidates: [
+        {
+          aiLikelihood: "high",
+          aiReason: "カナ氏名と生年月日が一致",
+          decidedAt: null,
+          decidedBy: null,
+          id: "cand_1",
+          member: {
+            birthDate: null,
+            id: "member_1",
+            memberNumber: "1",
+            name: "山田太郎",
+            nameKana: "ヤマダタロウ",
+            phone: "0300001111",
+            status: "active",
+          },
+          ruleScore: 60,
+          status: "pending",
+        },
+      ] as unknown as ApplicationDetail["matchCandidates"],
+    });
+    const api = fakeApi({ get: vi.fn().mockResolvedValue(application) });
+    render(
+      <ApplicationDetailPage
+        api={api}
+        applicationId="app_1"
+        onBack={vi.fn()}
+      />,
+    );
+    await screen.findByLabelText("氏名");
+
+    // 「フリガナ」「電話」のラベルでも申請データ側の値が拾え、会員データと一致するため
+    // ハイライトされない(以前は完全一致のみで空欄になり、誤って不一致扱いされていた)。
+    // 一致時は申請データ・会員データ双方に同じ文字列が並ぶため、行ラベルの列から辿る。
+    const kanaRow = screen.getByText("氏名カナ", { selector: "div" })
+      .parentElement as HTMLElement;
+    expect(kanaRow.getAttribute("data-differs")).toBe("false");
+    expect(within(kanaRow).getAllByText("ヤマダタロウ")).toHaveLength(2);
+    const phoneRow = screen.getByText("電話番号", { selector: "div" })
+      .parentElement as HTMLElement;
+    expect(phoneRow.getAttribute("data-differs")).toBe("false");
+    expect(within(phoneRow).getAllByText("0300001111")).toHaveLength(2);
+  });
+
   // コードレビュー指摘・ユーザー判断: 承認済み(確定状態)の申請はdecideMatch自体をAPI側で
   // 拒否するため、UI側も同じ条件で判断ボタンを出さない。
   it("hides match-candidate decision buttons once the application is approved (F-4-2)", async () => {
