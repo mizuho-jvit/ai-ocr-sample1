@@ -4,6 +4,13 @@
 
 ## 2026-09-04
 
+### 差戻し文面の編集・コピーを実装した（Task 020・コードレビュー指摘#3）
+
+- **申請詳細画面の差戻し文面案（`CheckRun.letterDraft`）を`textarea`で編集し、「コピー」でクリップボードへ書き込めるようにした。** これまでは文字列を表示するだけで、F-3-5「職員が編集・コピー可能であること」を満たしていなかった（`output/task-010-code-review.md`指摘#3）。職員はコピーした文面をメールソフト等へ貼り付けて送付する（自動送信・`mailto`起動はスコープ外のまま）。
+- **編集内容は保存しない（ユーザー判断・[決定#34](./requirements/decisions.md)）。** `letterDraft`の保存先`CheckRun`は追記専用でAI下書きを編集結果で上書きすると判定履歴の監査性（決定#6）を失うこと、要件が「下書き生成までが仕様」で送付後の文面を残す要求が無いこと、保存先を新設すると再実施時の扱い等の要件外の追加仕様が必要になることから、UI内の編集に留めた。画面には「編集内容は保存されません」と注記し、業務チェックを再実施したら`latestCheckRun.id`の`key`で再マウントして編集途中の内容を新しい下書きへ置き換える。将来「差戻し時の文面を証跡として残す」要望が出た場合の拡張先（`POST /api/applications/:id/status`の既存`note`）も決定#34に記した。
+- `src/react-app/components/letter-draft-editor.tsx`を新規作成した（`application-detail-page.tsx`が472行で500行ルールを超えるため分離。`match-candidate-card.tsx`・`ocr-field-row.tsx`と同じ方針）。クリップボード書き込みは`writeClipboard`プロップで注入可能にし、既定実装は`navigator.clipboard`が無い環境でフォールバックせず明示的に失敗させる。
+- `test/react-app/components/letter-draft-editor.test.tsx`（新規・初期表示と注記／編集後の値のコピーと成功通知／書き込み失敗時の手動コピー案内／`navigator.clipboard`欠如時の明示的失敗）と`application-detail-page.test.tsx`（`letterDraft`非null/nullでの表示切替、再実施で編集途中の内容が破棄され新しい下書きへ置き換わること）を追加した。`screen-list.md`「申請詳細」の記述にコピーと非保存を追記した。
+
 ### コードレビュー（別モデル）で決定#32の競合耐性を指摘され、修正した
 
 - **ほぼ同時に来た2件の`decideMatch(merged)`が競合すると、既存merged候補をJS側でSELECTしてから戻す実装ではmerged行が2件残ってしまう欠陥を修正した。** 両リクエストが「まだmergedは無い」を読んでしまい、後から候補Cをmergedにしても`.find()`が1件しか戻さないため、`merged`/`rejected`/`stale`は再判断不可という既存ルールにより片方が永久に修復不能なまま残る。

@@ -415,4 +415,85 @@ describe("ApplicationDetailPage", () => {
       ).toBeTruthy();
     });
   });
+
+  describe("差戻し文面の編集・コピー (F-3-5・決定#34)", () => {
+    function withLetterDraft(id: string, letterDraft: string | null) {
+      return baseApplication({
+        latestCheckRun: {
+          consistency: [],
+          createdAt: "2026-09-04T00:00:00.000Z",
+          createdBy: STAFF,
+          deficiencies: [{ label: "電話番号", message: "未記入です" }],
+          id,
+          letterDraft,
+          triage: "return_candidate",
+          triageReason: "不備あり",
+        },
+      } as unknown as Partial<ApplicationDetail>);
+    }
+
+    it("renders the draft in an editable textarea when present, and nothing when null", async () => {
+      const api = fakeApi({
+        get: vi.fn().mockResolvedValue(withLetterDraft("check_1", "下書きA")),
+      });
+      const { unmount } = render(
+        <ApplicationDetailPage
+          api={api}
+          applicationId="app_1"
+          onBack={vi.fn()}
+        />,
+      );
+      expect(
+        ((await screen.findByLabelText("差戻し文面案")) as HTMLTextAreaElement)
+          .value,
+      ).toBe("下書きA");
+      unmount();
+
+      render(
+        <ApplicationDetailPage
+          api={fakeApi({
+            get: vi.fn().mockResolvedValue(withLetterDraft("check_1", null)),
+          })}
+          applicationId="app_1"
+          onBack={vi.fn()}
+        />,
+      );
+      await screen.findByLabelText("氏名");
+      expect(screen.queryByLabelText("差戻し文面案")).toBeNull();
+    });
+
+    it("discards in-progress edits and shows the new draft after the check is rerun", async () => {
+      const rerun = withLetterDraft("check_2", "下書きB");
+      const run = vi.fn().mockResolvedValue({
+        application: rerun,
+        checkRun: rerun.latestCheckRun,
+        matchCandidates: [],
+        remainingRuns: 3,
+        usage: {},
+      } as unknown as RunCheckResponse);
+      const api = fakeApi({
+        get: vi.fn().mockResolvedValue(withLetterDraft("check_1", "下書きA")),
+      });
+      render(
+        <ApplicationDetailPage
+          api={api}
+          applicationId="app_1"
+          checksApi={{ run }}
+          onBack={vi.fn()}
+        />,
+      );
+      fireEvent.change(await screen.findByLabelText("差戻し文面案"), {
+        target: { value: "編集途中" },
+      });
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "業務チェックを再実施" }),
+      );
+
+      expect(await screen.findByText(/残り再実施回数: 3回/)).toBeTruthy();
+      expect(
+        (screen.getByLabelText("差戻し文面案") as HTMLTextAreaElement).value,
+      ).toBe("下書きB");
+    });
+  });
 });

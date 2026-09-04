@@ -14,6 +14,7 @@ import {
   ChecksApiError,
   checksApi as defaultChecksApi,
 } from "../api/checks";
+import { LetterDraftEditor } from "../components/letter-draft-editor";
 import { MatchCandidateCard } from "../components/match-candidate-card";
 import { APP_STATUS_LABELS, TRIAGE_LABELS } from "../labels";
 
@@ -413,17 +414,11 @@ export function ApplicationDetailPage({
                   </ul>
                 )}
                 {application.latestCheckRun.letterDraft !== null && (
-                  <div
-                    style={{
-                      background: "var(--amber-bg)",
-                      border: "1px solid var(--amber-border)",
-                      borderRadius: 6,
-                      fontSize: 12,
-                      padding: 8,
-                    }}
-                  >
-                    差戻し文面案: {application.latestCheckRun.letterDraft}
-                  </div>
+                  // 再実施でCheckRunが変わったら編集途中の内容を捨てて新しい下書きへ置き換える（決定#34）。
+                  <LetterDraftEditor
+                    draft={application.latestCheckRun.letterDraft}
+                    key={application.latestCheckRun.id}
+                  />
                 )}
                 <button
                   className="btn btn-ghost btn-small"
