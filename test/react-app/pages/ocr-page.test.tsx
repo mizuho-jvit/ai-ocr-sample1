@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { ApplicationsApiError } from "../../../src/react-app/api/applications";
+import { ChecksApiError } from "../../../src/react-app/api/checks";
 import { OcrApiError } from "../../../src/react-app/api/ocr";
 import { OcrPage } from "../../../src/react-app/pages/ocr-page";
 import type {
@@ -134,30 +136,168 @@ describe("OcrPage", () => {
     expect(screen.getByText("・修正済")).toBeTruthy();
   });
 
-  it("does nothing when '業務チェックへ進む' is clicked (F-3 未実装)", async () => {
-    const extract = vi
-      .fn()
-      .mockResolvedValue({ application: APPLICATION, usage: USAGE });
-    const resizeImage = vi.fn().mockResolvedValue(IMAGE);
+  describe("'業務チェックへ進む' (F-4-6・決定#33)", () => {
+    async function renderWithExtractedApplication() {
+      const extract = vi
+        .fn()
+        .mockResolvedValue({ application: APPLICATION, usage: USAGE });
+      const resizeImage = vi.fn().mockResolvedValue(IMAGE);
+      const updateFields = vi.fn().mockResolvedValue(APPLICATION);
+      const run = vi.fn().mockResolvedValue({
+        application: APPLICATION,
+        checkRun: { id: "check-1" },
+        matchCandidates: [],
+        remainingRuns: 4,
+        usage: USAGE,
+      });
+      const onProceedToCheck = vi.fn();
 
-    render(<OcrPage api={{ extract }} resizeImage={resizeImage} />);
-    const input = document.getElementById("ocr-file-input") as Element;
-    fireEvent.change(input, {
-      target: {
-        files: [new File(["fake-bytes"], "form.jpg", { type: "image/jpeg" })],
-      },
+      render(
+        <OcrPage
+          api={{ extract }}
+          applicationsApi={{ updateFields }}
+          checksApi={{ run }}
+          onProceedToCheck={onProceedToCheck}
+          resizeImage={resizeImage}
+        />,
+      );
+      const input = document.getElementById("ocr-file-input") as Element;
+      fireEvent.change(input, {
+        target: {
+          files: [new File(["fake-bytes"], "form.jpg", { type: "image/jpeg" })],
+        },
+      });
+      await screen.findByText(/利用者登録申請書/);
+
+      return { onProceedToCheck, run, updateFields };
+    }
+
+    it("saves the current fields, runs the check, then proceeds to the application detail screen", async () => {
+      const { onProceedToCheck, run, updateFields } =
+        await renderWithExtractedApplication();
+      const nameField = screen.getByLabelText("氏名") as HTMLInputElement;
+      fireEvent.change(nameField, { target: { value: "山田次郎" } });
+
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "業務チェックへ進む(整合性・不備・重複・判定)",
+        }),
+      );
+
+      await vi.waitFor(() => {
+        expect(onProceedToCheck).toHaveBeenCalledWith("app_1");
+      });
+      expect(updateFields).toHaveBeenCalledWith("app_1", {
+        fields: [
+          { label: "氏名", value: "山田次郎" },
+          { label: "電話番号", value: "" },
+        ],
+      });
+      // 保存が完了してから業務チェックを実行する(決定#33)。
+      expect(updateFields.mock.invocationCallOrder[0]).toBeLessThan(
+        run.mock.invocationCallOrder[0],
+      );
+      expect(run).toHaveBeenCalledWith({ applicationId: "app_1" });
     });
-    await screen.findByText(/利用者登録申請書/);
 
-    fireEvent.click(
-      screen.getByRole("button", {
+    it("does not run the check when saving the fields fails, and shows the server message", async () => {
+      const { run, updateFields } = await renderWithExtractedApplication();
+      updateFields.mockRejectedValue(
+        new ApplicationsApiError(
+          "VALIDATION_ERROR",
+          422,
+          "入力内容を確認してください。",
+        ),
+      );
+
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "業務チェックへ進む(整合性・不備・重複・判定)",
+        }),
+      );
+
+      expect(
+        await screen.findByText("入力内容を確認してください。"),
+      ).toBeTruthy();
+      expect(run).not.toHaveBeenCalled();
+      // 読取結果の確認画面のまま(離脱しない)。
+      expect(screen.getByText(/利用者登録申請書/)).toBeTruthy();
+    });
+
+    it("shows the server message and stays on this screen when the check run limit is reached (409)", async () => {
+      const { onProceedToCheck, run } = await renderWithExtractedApplication();
+      run.mockRejectedValue(
+        new ChecksApiError(
+          "CHECK_RUN_LIMIT",
+          409,
+          "業務チェックの実施回数が上限に達しました。",
+          false,
+        ),
+      );
+
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "業務チェックへ進む(整合性・不備・重複・判定)",
+        }),
+      );
+
+      expect(
+        await screen.findByText("業務チェックの実施回数が上限に達しました。"),
+      ).toBeTruthy();
+      expect(onProceedToCheck).not.toHaveBeenCalled();
+      expect(screen.getByText(/利用者登録申請書/)).toBeTruthy();
+    });
+
+    it("disables the button while the request is in flight", async () => {
+      const extract = vi
+        .fn()
+        .mockResolvedValue({ application: APPLICATION, usage: USAGE });
+      const resizeImage = vi.fn().mockResolvedValue(IMAGE);
+      let resolveUpdateFields: (value: ApplicationDetail) => void = () => {};
+      const updateFields = vi.fn(
+        () =>
+          new Promise<ApplicationDetail>((resolve) => {
+            resolveUpdateFields = resolve;
+          }),
+      );
+      const run = vi.fn().mockResolvedValue({
+        application: APPLICATION,
+        checkRun: { id: "check-1" },
+        matchCandidates: [],
+        remainingRuns: 4,
+        usage: USAGE,
+      });
+
+      render(
+        <OcrPage
+          api={{ extract }}
+          applicationsApi={{ updateFields }}
+          checksApi={{ run }}
+          onProceedToCheck={vi.fn()}
+          resizeImage={resizeImage}
+        />,
+      );
+      const input = document.getElementById("ocr-file-input") as Element;
+      fireEvent.change(input, {
+        target: {
+          files: [new File(["fake-bytes"], "form.jpg", { type: "image/jpeg" })],
+        },
+      });
+      await screen.findByText(/利用者登録申請書/);
+
+      const button = screen.getByRole("button", {
         name: "業務チェックへ進む(整合性・不備・重複・判定)",
-      }),
-    );
+      });
+      fireEvent.click(button);
+      await vi.waitFor(() => {
+        expect((button as HTMLButtonElement).disabled).toBe(true);
+      });
 
-    // 押しても何も起きない: 読取結果の確認画面のまま。
-    expect(screen.getByText(/利用者登録申請書/)).toBeTruthy();
-    expect(extract).toHaveBeenCalledOnce();
+      resolveUpdateFields(APPLICATION);
+      await vi.waitFor(() => {
+        expect(run).toHaveBeenCalledOnce();
+      });
+    });
   });
 
   it("returns to the upload screen when '中断する' is clicked", async () => {

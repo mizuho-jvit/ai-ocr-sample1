@@ -2,6 +2,25 @@
 
 <!-- 予約ファイル。フロントマターは付けない。日付見出し（ISO 8601）ごとに新しいものを上に追記する。 -->
 
+## 2026-09-04
+
+### コードレビュー（別モデル）で決定#32の競合耐性を指摘され、修正した
+
+- **ほぼ同時に来た2件の`decideMatch(merged)`が競合すると、既存merged候補をJS側でSELECTしてから戻す実装ではmerged行が2件残ってしまう欠陥を修正した。** 両リクエストが「まだmergedは無い」を読んでしまい、後から候補Cをmergedにしても`.find()`が1件しか戻さないため、`merged`/`rejected`/`stale`は再判断不可という既存ルールにより片方が永久に修復不能なまま残る。
+- **`reserveCheckRunSlot`・`incrementUsageCounter`と同じ「WHERE句に条件を埋め込んだUPDATE1文」方式に変更した。** `src/worker/db/client.ts`に`whereOtherMergedMatchCandidates`（`applicationId`一致・`status = 'merged'`・対象候補以外というSqlExprを構築するだけの純関数）を追加し、`application-service.ts`の`decideMatch`から事前SELECT（`previouslyMergedCandidate`）を削除してこのWHERE句によるUPDATEに置き換えた。batch実行時点でDB上に実在するmerged行を全件対象にするため、次の1回の`decideMatch`で必ず1件に収束する。
+- `application-service-match.test.ts`へ、merged候補が2件ある状態から1回の判断で両方pendingへ戻ることを確認するテストを追加した。`api.md`の#13応答コード・`INVALID_TRANSITION`の説明をこの設計に合わせて更新し、決定#32へ追記した。
+- `corepack pnpm test`（38ファイル・356テスト）/ `lint` / `tsc -b` / `build` で確認し、コミットした（`9b36f2f`）。
+
+### 業務チェックへの画面動線を実装した（Task 019・コードレビュー指摘#2）
+
+- **OCR確認画面の「業務チェックへ進む」ボタンと申請詳細画面の「業務チェックを実施/再実施」ボタンから`POST /api/checks/run`を呼べるようにした。** バックエンド（Task 009）は完成していたが、押しても何も起きない空関数（`handleProceedToCheck`）のままで、商談動線「OCR読取→業務チェック→名寄せ→承認」をUIから実行できなかった（`output/task-010-code-review.md`指摘#2）。
+- **OCR確認画面でその場修正した項目は、`applicationsApi.updateFields`で保存してから`checksApi.run`を呼ぶ（ユーザー判断・決定#33）。** F-4-6「業務チェックの再実施は編集内容を含む現在の抽出データで行う」の趣旨に沿い、読み間違いの訂正を業務チェック・名寄せへ確実に反映させる。保存に失敗した場合は業務チェックを実行しない。成功後は`AppShell`の既存`handleSelectApplication`をそのまま`onProceedToCheck`として渡し、申請詳細画面へ遷移する（SPAにルーターを導入しない方針=決定#31を維持）。
+- **`src/react-app/api/checks.ts`を新規実装した。** `api/ocr.ts`の`OcrApiError`/`toErrorMessage`と同じ構成（`ChecksApiError`は`retryable`を持ち、`AI_UNAVAILABLE`(503)の再試行可否を画面が判断できる）。`ChecksApi.run`はWorker側のbranded`ApplicationId`ではなく素の`string`を受け取る（`ApplicationsApi`と同じSPA境界の方針）。
+- **`OcrPage`・`ApplicationDetailPage`は複数のAPIモジュール（`OcrApi`/`ApplicationsApi`/`ChecksApi`）を跨ぐため、各モジュール固有のエラークラスを横断して判定するローカルな解決関数（`toProceedErrorMessage`・`toRunCheckErrorMessage`）を用意した。** 各モジュールの`toErrorMessage`は自分のエラークラスしか認識しないため、複数APIを呼ぶ画面側でこれを素通しすると他モジュールのエラーメッセージがFALLBACK_MESSAGEへ落ちてしまう問題を避けた。
+- **画面一覧の「業務チェック結果」を独立画面として作らず申請詳細へ統合する方針を`screen-list.md`へ明記した（11画面→10画面）。** 候補判断APIが`/api/applications/:id/match-candidates/*`に置かれていること（決定#2）と実装（Task 010で申請詳細へ統合済み）を正典側で揃えた。
+- `ocr-page.tsx`が500行ルールを超えたため、読取確認行コンポーネント`OcrFieldRow`（`CONFIDENCE_HIGHLIGHT_THRESHOLD`・`EditableField`を含む）を`src/react-app/components/ocr-field-row.tsx`へ分離した（`match-candidate-card.tsx`と同じ方針）。
+- `test/react-app/api/checks.test.ts`（新規）、`ocr-page.test.tsx`（進むボタンの保存→実行→遷移・保存失敗・409エラー・disabled状態）、`application-detail-page.test.tsx`（実施/再実施・ラベル切替・承認済みで実行不可・409エラー）を追加した。`corepack pnpm test`（39ファイル・368テスト）/ `lint` / `tsc -b` / `build` で確認した。
+
 ## 2026-09-03
 
 ### 申請管理と名寄せ判断画面を実装した（Task 010）

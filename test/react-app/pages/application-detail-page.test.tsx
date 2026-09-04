@@ -1,10 +1,12 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { ChecksApiError } from "../../../src/react-app/api/checks";
 import { ApplicationDetailPage } from "../../../src/react-app/pages/application-detail-page";
 import type {
   ApplicationDetail,
   ChangeAppStatusResponse,
   DecideMatchResponse,
+  RunCheckResponse,
 } from "../../../src/worker/types/contracts";
 
 const STAFF = {
@@ -306,5 +308,111 @@ describe("ApplicationDetailPage", () => {
     );
 
     expect(await screen.findByRole("alert")).toBeTruthy();
+  });
+
+  describe("業務チェックを実施/再実施 (F-4-6)", () => {
+    it("runs the check and refreshes the application on success", async () => {
+      const application = baseApplication({ latestCheckRun: null });
+      const updated = baseApplication({
+        appStatus: "under_review",
+        latestCheckRun: {
+          consistency: [],
+          createdAt: "2026-09-04T00:00:00.000Z",
+          createdBy: STAFF,
+          deficiencies: [],
+          id: "check_1",
+          letterDraft: null,
+          triage: "approval_candidate",
+          triageReason: "整合",
+        },
+      } as unknown as Partial<ApplicationDetail>);
+      const run = vi.fn().mockResolvedValue({
+        application: updated,
+        checkRun: updated.latestCheckRun,
+        matchCandidates: [],
+        remainingRuns: 4,
+        usage: {},
+      } as unknown as RunCheckResponse);
+      const api = fakeApi({ get: vi.fn().mockResolvedValue(application) });
+      render(
+        <ApplicationDetailPage
+          api={api}
+          applicationId="app_1"
+          checksApi={{ run }}
+          onBack={vi.fn()}
+        />,
+      );
+      await screen.findByLabelText("氏名");
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "業務チェックを実施" }),
+      );
+
+      expect(run).toHaveBeenCalledWith({ applicationId: "app_1" });
+      expect(await screen.findByText(/整合/)).toBeTruthy();
+      expect(screen.getByText(/残り再実施回数: 4回/)).toBeTruthy();
+    });
+
+    it("labels the button 'rerun' once a check has already run, and disables it once approved", async () => {
+      const application = baseApplication({
+        appStatus: "approved",
+        latestCheckRun: {
+          consistency: [],
+          createdAt: "2026-09-04T00:00:00.000Z",
+          createdBy: STAFF,
+          deficiencies: [],
+          id: "check_1",
+          letterDraft: null,
+          triage: "approval_candidate",
+          triageReason: "整合",
+        },
+      } as unknown as Partial<ApplicationDetail>);
+      const api = fakeApi({ get: vi.fn().mockResolvedValue(application) });
+      render(
+        <ApplicationDetailPage
+          api={api}
+          applicationId="app_1"
+          onBack={vi.fn()}
+        />,
+      );
+      await screen.findByLabelText("氏名");
+
+      const button = screen.getByRole("button", {
+        name: "業務チェックを再実施",
+      });
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("shows the server message when the check-run limit is reached (409) and does not update the application", async () => {
+      const application = baseApplication({ latestCheckRun: null });
+      const run = vi
+        .fn()
+        .mockRejectedValue(
+          new ChecksApiError(
+            "CHECK_RUN_LIMIT",
+            409,
+            "業務チェックの実施回数が上限に達しました。",
+            false,
+          ),
+        );
+      const api = fakeApi({ get: vi.fn().mockResolvedValue(application) });
+      render(
+        <ApplicationDetailPage
+          api={api}
+          applicationId="app_1"
+          checksApi={{ run }}
+          onBack={vi.fn()}
+        />,
+      );
+      await screen.findByLabelText("氏名");
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "業務チェックを実施" }),
+      );
+
+      expect(
+        await screen.findByText("業務チェックの実施回数が上限に達しました。"),
+      ).toBeTruthy();
+    });
   });
 });

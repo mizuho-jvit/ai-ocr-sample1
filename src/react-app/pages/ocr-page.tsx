@@ -2,13 +2,29 @@ import { type ChangeEvent, type DragEvent, useState } from "react";
 
 import type {
   ApplicationDetail,
-  ApplicationField,
   UsageResponse,
 } from "../../worker/types/contracts";
-import { type OcrApi, resizeImageToJpeg, toErrorMessage } from "../api/ocr";
-
-/** NF-4-3: 確信度閾値は定数として一元管理する（環境変数では変更しない）。 */
-const CONFIDENCE_HIGHLIGHT_THRESHOLD = 0.85;
+import {
+  type ApplicationsApi,
+  ApplicationsApiError,
+  applicationsApi as defaultApplicationsApi,
+} from "../api/applications";
+import {
+  type ChecksApi,
+  ChecksApiError,
+  checksApi as defaultChecksApi,
+} from "../api/checks";
+import {
+  type OcrApi,
+  OcrApiError,
+  resizeImageToJpeg,
+  toErrorMessage,
+} from "../api/ocr";
+import {
+  CONFIDENCE_HIGHLIGHT_THRESHOLD,
+  type EditableField,
+  OcrFieldRow,
+} from "../components/ocr-field-row";
 
 /** Task 004の慣習（E2Eテストからの参照を安定させる固定id）に合わせる。 */
 const FILE_INPUT_ID = "ocr-file-input";
@@ -23,20 +39,34 @@ const STAGE_MESSAGE: Partial<Record<Stage, string>> = {
   uploading: "AIが読み取っています…",
 };
 
-/**
- * 🟡 Intent: 読取確認画面だけのUI状態（確認済みかどうか）。サーバー契約
- * （`ApplicationField`）には無く、PATCH APIも未実装（Task 010）のため保存はしない。
- * 画面を離れると失われる、閲覧中だけのハイライト解除に留まる。
- */
-interface EditableField extends ApplicationField {
-  confirmed: boolean;
-}
-
 export interface OcrPageProps {
   api: Pick<OcrApi, "extract">;
+  applicationsApi?: Pick<ApplicationsApi, "updateFields">;
+  checksApi?: Pick<ChecksApi, "run">;
+  onProceedToCheck?: (applicationId: string) => void;
   resizeImage?: (
     file: File,
   ) => Promise<Parameters<OcrApi["extract"]>[0]["image"]>;
+}
+
+/** 🔵 Intent: `api/ocr.ts`のOcrApiErrorと同じFALLBACK_MESSAGEを踏襲する。 */
+const PROCEED_FALLBACK_MESSAGE = "予期しないエラーが発生しました。";
+
+/**
+ * 🔵 Intent: この画面は`OcrApi`・`ApplicationsApi`・`ChecksApi`の3つのAPIモジュールを跨ぐため、
+ * それぞれ独自のエラークラス（`OcrApiError`/`ApplicationsApiError`/`ChecksApiError`）を
+ * 横断して扱う。各モジュールのメッセージはサーバーの`ERROR_MESSAGES`（日本語）をそのまま
+ * 転記しているため、ここでは型を判定してmessageを取り出すだけでよい。
+ */
+function toProceedErrorMessage(error: unknown): string {
+  if (
+    error instanceof OcrApiError ||
+    error instanceof ApplicationsApiError ||
+    error instanceof ChecksApiError
+  ) {
+    return error.message;
+  }
+  return PROCEED_FALLBACK_MESSAGE;
 }
 
 function formatSeconds(seconds: number): string {
@@ -45,115 +75,16 @@ function formatSeconds(seconds: number): string {
   return minutes > 0 ? `${minutes}分${remaining}秒` : `${remaining}秒`;
 }
 
-interface OcrFieldRowProps {
-  field: EditableField;
-  index: number;
-  isFirst: boolean;
-  onChange: (index: number, value: string) => void;
-  onConfirm: (index: number) => void;
-}
-
-/** 🔵 Intent: `ai-ocr-demo.jsx`の読取確認行（ラベル＋テキスト入力＋確度＋OK）を踏襲する。 */
-function OcrFieldRow({
-  field,
-  index,
-  isFirst,
-  onChange,
-  onConfirm,
-}: OcrFieldRowProps) {
-  const needsCheck =
-    field.confidence < CONFIDENCE_HIGHLIGHT_THRESHOLD && !field.confirmed;
-
-  return (
-    <div
-      data-needs-check={needsCheck}
-      style={{
-        alignItems: "flex-start",
-        background: needsCheck ? "var(--amber-bg)" : "transparent",
-        borderLeft: needsCheck
-          ? "4px solid var(--amber-border)"
-          : "4px solid transparent",
-        borderTop: isFirst ? "none" : "1px solid var(--rule)",
-        display: "flex",
-        gap: 12,
-        padding: "10px 14px",
-      }}
-    >
-      <div
-        style={{
-          color: "var(--ink-soft)",
-          flexShrink: 0,
-          fontSize: 12,
-          lineHeight: 1.5,
-          paddingTop: 10,
-          width: 96,
-        }}
-      >
-        {field.label}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <input
-          aria-label={field.label}
-          className="field-input"
-          onChange={(event) => onChange(index, event.target.value)}
-          placeholder="（空欄）"
-          value={field.value}
-        />
-        <div
-          style={{
-            alignItems: "center",
-            display: "flex",
-            gap: 8,
-            marginTop: 3,
-          }}
-        >
-          <span
-            style={{
-              color: needsCheck ? "var(--amber-border)" : "var(--ink-soft)",
-              fontSize: 11,
-            }}
-          >
-            確度 {Math.round(field.confidence * 100)}%
-            {field.edited && (
-              <span style={{ color: "var(--vermilion)" }}> ・修正済</span>
-            )}
-            {!field.edited && field.confirmed && (
-              <span style={{ color: "var(--ok-green)" }}> ・確認済</span>
-            )}
-          </span>
-        </div>
-      </div>
-      {needsCheck && (
-        <button
-          className="btn"
-          onClick={() => onConfirm(index)}
-          style={{
-            background: "#fff",
-            border: "1px solid var(--amber-border)",
-            borderRadius: 6,
-            color: "var(--amber-border)",
-            flexShrink: 0,
-            fontSize: 12,
-            marginTop: 6,
-            padding: "5px 12px",
-          }}
-          type="button"
-        >
-          OK
-        </button>
-      )}
-    </div>
-  );
-}
-
 /**
  * 🔴 Intent: 画面一覧の「ホーム（アップロード＋台帳）」のうちアップロード部分と
  * 「読取確認」の結果表示を1画面にまとめた。台帳（申請状況一覧）は後続タスク
- * （申請管理画面）の範囲。「業務チェックへ進む」ボタンはデザイン一致のため設置するが
- * 機能はTask 009の範囲でまだ無く、押しても何も行わない（ユーザー指示）。
+ * （申請管理画面）の範囲。
  */
 export function OcrPage({
   api,
+  applicationsApi = defaultApplicationsApi,
+  checksApi = defaultChecksApi,
+  onProceedToCheck = () => {},
   resizeImage = resizeImageToJpeg,
 }: OcrPageProps) {
   const [stage, setStage] = useState<Stage>("idle");
@@ -164,6 +95,10 @@ export function OcrPage({
   const [fields, setFields] = useState<EditableField[]>([]);
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [isProceeding, setIsProceeding] = useState(false);
+  const [proceedErrorMessage, setProceedErrorMessage] = useState<string | null>(
+    null,
+  );
 
   const isProcessing = stage === "resizing" || stage === "uploading";
   const lowConfidenceCount = fields.filter(
@@ -177,6 +112,7 @@ export function OcrPage({
     }
 
     setErrorMessage(null);
+    setProceedErrorMessage(null);
     setApplication(null);
     setFields([]);
     setImagePreviewUrl(null);
@@ -221,11 +157,32 @@ export function OcrPage({
   }
 
   /**
-   * 🔴 Intent: 業務チェック(F-3)はTask 009の範囲でまだ実装がない。
-   * `ai-ocr-demo.jsx`とのデザイン一致のためボタンは設置するが、押しても何も行わない
-   * （ユーザー指示）。
+   * 🔵 Intent: F-4-6「業務チェックの再実施は編集内容を含む現在の抽出データで行う」の趣旨に
+   * 沿い、この画面でその場修正した値を`updateFields`で保存してから`checksApi.run`を呼ぶ
+   * （ユーザー判断・決定#33）。保存に失敗した場合は業務チェックを実行しない。成功後は
+   * 申請詳細画面（`onProceedToCheck`）へ遷移し、結果表示はその画面に委ねる。
    */
-  function handleProceedToCheck() {}
+  async function handleProceedToCheck() {
+    if (application === null || isProceeding) {
+      return;
+    }
+    setIsProceeding(true);
+    setProceedErrorMessage(null);
+    try {
+      await applicationsApi.updateFields(application.id, {
+        fields: fields.map((field) => ({
+          label: field.label,
+          value: field.value,
+        })),
+      });
+      await checksApi.run({ applicationId: application.id });
+      onProceedToCheck(application.id);
+    } catch (error) {
+      setProceedErrorMessage(toProceedErrorMessage(error));
+    } finally {
+      setIsProceeding(false);
+    }
+  }
 
   /**
    * 🔵 Intent: `ai-ocr-demo.jsx`のresetScanと同じく、申請は既に「受付」で保存済みのため
@@ -234,6 +191,7 @@ export function OcrPage({
   function handleAbort() {
     setStage("idle");
     setErrorMessage(null);
+    setProceedErrorMessage(null);
     setApplication(null);
     setFields([]);
     setUsage(null);
@@ -451,6 +409,12 @@ export function OcrPage({
             </div>
           </div>
 
+          {proceedErrorMessage !== null && (
+            <p className="alert" role="alert" style={{ marginTop: 16 }}>
+              {proceedErrorMessage}
+            </p>
+          )}
+
           <div
             style={{
               display: "flex",
@@ -461,7 +425,8 @@ export function OcrPage({
           >
             <button
               className="btn btn-primary"
-              onClick={handleProceedToCheck}
+              disabled={isProceeding}
+              onClick={() => void handleProceedToCheck()}
               style={{ flex: "1 1 200px", fontSize: 15 }}
               type="button"
             >
@@ -469,6 +434,7 @@ export function OcrPage({
             </button>
             <button
               className="btn btn-ghost"
+              disabled={isProceeding}
               onClick={handleAbort}
               type="button"
             >

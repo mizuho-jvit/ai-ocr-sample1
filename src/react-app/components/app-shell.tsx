@@ -212,7 +212,9 @@ export function AppShell() {
         session={session}
       />
       <main style={{ marginBottom: 24 }}>
-        {screen === "home" && <OcrPage api={ocrApi} />}
+        {screen === "home" && (
+          <OcrPage api={ocrApi} onProceedToCheck={handleSelectApplication} />
+        )}
         {screen === "applications" && (
           <ApplicationListPage
             api={applicationsApi}

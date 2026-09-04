@@ -9,6 +9,11 @@ import type {
 } from "../../worker/types/contracts";
 import type { ApplicationsApi } from "../api/applications";
 import { toErrorMessage } from "../api/applications";
+import {
+  type ChecksApi,
+  ChecksApiError,
+  checksApi as defaultChecksApi,
+} from "../api/checks";
 import { MatchCandidateCard } from "../components/match-candidate-card";
 import { APP_STATUS_LABELS, TRIAGE_LABELS } from "../labels";
 
@@ -37,8 +42,17 @@ export interface ApplicationDetailPageProps {
     | "listCheckRuns"
     | "imageUrl"
   >;
+  checksApi?: Pick<ChecksApi, "run">;
   applicationId: string;
   onBack: () => void;
+}
+
+/** 🔵 Intent: `ChecksApiError`固有のメッセージを優先し、それ以外は`api/applications.ts`の
+ * `toErrorMessage`（`ApplicationsApiError`判定・共通FALLBACK_MESSAGE）へ委ねる。 */
+function toRunCheckErrorMessage(error: unknown): string {
+  return error instanceof ChecksApiError
+    ? error.message
+    : toErrorMessage(error);
 }
 
 /**
@@ -48,6 +62,7 @@ export interface ApplicationDetailPageProps {
  */
 export function ApplicationDetailPage({
   api,
+  checksApi = defaultChecksApi,
   applicationId,
   onBack,
 }: ApplicationDetailPageProps) {
@@ -63,6 +78,8 @@ export function ApplicationDetailPage({
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingFields, setIsSavingFields] = useState(false);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
+  const [isRunningCheck, setIsRunningCheck] = useState(false);
+  const [checkRunNotice, setCheckRunNotice] = useState<string | null>(null);
   const [decidingCandidateId, setDecidingCandidateId] = useState<string | null>(
     null,
   );
@@ -133,6 +150,28 @@ export function ApplicationDetailPage({
       setErrorMessage(toErrorMessage(error));
     } finally {
       setIsChangingStatus(false);
+    }
+  }
+
+  /** 🔵 Intent: F-4-6。承認済みは呼び出し側(ボタンのdisabled)で防ぐが、API側(business-check.ts)でも再検証される。 */
+  async function handleRunCheck() {
+    if (application === null || isRunningCheck) {
+      return;
+    }
+    setIsRunningCheck(true);
+    setErrorMessage(null);
+    try {
+      const result = await checksApi.run({ applicationId });
+      setApplication(result.application);
+      setFields(result.application.fields);
+      setCheckRunHistory(null);
+      setCheckRunNotice(
+        `業務チェックを実施しました(残り再実施回数: ${result.remainingRuns}回)。`,
+      );
+    } catch (error) {
+      setErrorMessage(toRunCheckErrorMessage(error));
+    } finally {
+      setIsRunningCheck(false);
     }
   }
 
@@ -296,6 +335,44 @@ export function ApplicationDetailPage({
               >
                 項目を保存
               </button>
+            </div>
+
+            <div className="card" style={{ padding: 12 }}>
+              <h3 style={{ fontSize: 13, margin: "0 0 8px" }}>業務チェック</h3>
+              <button
+                className="btn btn-primary btn-small"
+                disabled={
+                  isRunningCheck || application.appStatus === "approved"
+                }
+                onClick={() => void handleRunCheck()}
+                type="button"
+              >
+                {application.latestCheckRun !== null
+                  ? "業務チェックを再実施"
+                  : "業務チェックを実施"}
+              </button>
+              {application.appStatus === "approved" && (
+                <p
+                  style={{
+                    color: "var(--ink-soft)",
+                    fontSize: 12,
+                    margin: "8px 0 0",
+                  }}
+                >
+                  承認済みの申請では実施できません。
+                </p>
+              )}
+              {checkRunNotice !== null && (
+                <p
+                  style={{
+                    color: "var(--ok-green)",
+                    fontSize: 12,
+                    margin: "8px 0 0",
+                  }}
+                >
+                  ✓ {checkRunNotice}
+                </p>
+              )}
             </div>
 
             {application.latestCheckRun !== null && (
