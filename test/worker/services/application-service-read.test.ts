@@ -391,4 +391,42 @@ describe("updateFields (api.md #10・F-4-5)", () => {
       }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
+
+  it("updates each occurrence of a duplicated label independently, by position, instead of collapsing them (コードレビュー指摘#5)", async () => {
+    const duplicateLabelFields: ApplicationField[] = [
+      { confidence: 1, edited: false, label: "氏名", value: "仙台 一郎" },
+      { confidence: 1, edited: false, label: "電話番号", value: "0300001111" },
+      { confidence: 1, edited: false, label: "氏名", value: "" },
+    ];
+    await insertApplication({ fields: duplicateLabelFields });
+
+    // 画面は常に全項目を同じ並び順で送り返す(ocr-page.tsx・application-detail-page.tsx)。
+    const detail = await service().updateFields(APPLICATION_ID, ACTOR, {
+      fields: duplicateLabelFields.map((field) => ({
+        label: field.label,
+        value: field.value,
+      })),
+    });
+
+    expect(detail.fields).toEqual(duplicateLabelFields);
+    expect(detail.editedCount).toBe(0);
+  });
+
+  it("applies a partial update to the first not-yet-matched occurrence of a duplicated label", async () => {
+    const duplicateLabelFields: ApplicationField[] = [
+      { confidence: 1, edited: false, label: "氏名", value: "仙台 一郎" },
+      { confidence: 1, edited: false, label: "氏名", value: "" },
+    ];
+    await insertApplication({ fields: duplicateLabelFields });
+
+    const detail = await service().updateFields(APPLICATION_ID, ACTOR, {
+      fields: [{ label: "氏名", value: "仙台 次郎" }],
+    });
+
+    expect(detail.fields).toEqual([
+      { confidence: 1, edited: true, label: "氏名", value: "仙台 次郎" },
+      { confidence: 1, edited: false, label: "氏名", value: "" },
+    ]);
+    expect(detail.editedCount).toBe(1);
+  });
 });

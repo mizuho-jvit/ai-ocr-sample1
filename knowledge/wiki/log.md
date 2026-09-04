@@ -4,6 +4,21 @@
 
 ## 2026-09-04
 
+### 判子スタンプ・ステータスバッジを実装した（Task 022・決定#36）
+
+- **overview.md「デザイン要件」の「判定表示｜判子風の円形スタンプ」と、申請ステータスのバッジ表示を実装した。** `theme.css`新設時（Task 007）に「デモ固有の演出は後続タスクの対象」として明示的に未実装のまま残っており、acceptance.mdの「判子風スタンプが維持されている」という受け入れ基準も未達だった。その後のどのタスクでも拾われていなかった。
+- **プロトタイプ`ai-ocr-demo.jsx`の`TriageStamp`・`AppStatusBadge`をそのまま踏襲し、`src/react-app/components/{triage-stamp,app-status-badge}.tsx`として実装した。** 色はプロトタイプのハードコード16進値ではなく、既存の`theme.css`のCSSカスタムプロパティへ対応付け直した。トリアージスタンプは4文字以上のラベルを2行に折り返す（プロトタイプと同じ`slice(0,3)`/`slice(3)`分割）。
+- 申請詳細画面のヘッダーと業務チェック結果カード、申請状況一覧の各行に配線した。`TriageStamp`の`aria-label`により囲むセルのアクセシブルネームが変わる箇所があり、`application-list-page.test.tsx`の該当テストの問い合わせ方法を調整した。
+- `test/react-app/components/{triage-stamp,app-status-badge}.test.tsx`を新規追加した。`corepack pnpm test`（42ファイル・384テスト）/ `lint` / `tsc -b` / `build` で確認した。
+
+### 同一ラベル複数項目の編集を修正した（Task 021・コードレビュー指摘#5）
+
+- **`PATCH /api/applications/:id/fields`が、同じラベルの項目が複数ある帳票で編集を破壊する欠陥を修正した。** 実機確認で、OCR読取直後は正しく入っていた氏名・氏名カナが「業務チェックへ進む」を押した直後に空欄化する不具合として顕在化した。原因は`application-service.ts`の`updateFields`がリクエストの`fields`をラベルだけの`Map`へ畳み込んでいたため、同ラベルの項目（今回のサンプル帳票は氏名・氏名カナ・生年月日の欄が2箇所ある）のうち最後の1件（空欄）が同ラベルの全項目へ適用されていたこと。
+- **リクエストの並び順どおりに1件ずつ消費し、まだ対応付けていない同ラベルの最初の項目へ割り当てる方式に変更した（[決定#35](./requirements/decisions.md)）。** 画面（`ocr-page.tsx`・`application-detail-page.tsx`）は常に`application.fields`と同じ並び順で全項目を送り返すため、この方式で出現順の対応関係を復元できる。APIの入出力形状は変更していないため、既存の部分更新（未指定ラベルはそのまま）のテストもそのまま成立する。
+- `ocr-page.tsx`・`application-detail-page.tsx`のReactの`key`とHTMLの`id`/`htmlFor`が`field.label`を使い同ラベルで衝突していたため、並び順が変わらない`index`へ変更した。
+- 診断過程で、ローカルD1のマイグレーション未適用（3件）によるOCR保存時の`D1_ERROR: table applications has no column named check_run_count`も別途発見・解消した。`wrangler d1 migrations apply`は未適用分だけを実行し既存データを消さないことを確認し、`docs/dev/context.md`の`db:migrate`の説明に「新しいマイグレーションが増えたら再実行が必要」を追記した。
+- `test/worker/services/application-service-read.test.ts`（同ラベル複数項目の全件送り返し・部分更新）、`test/react-app/pages/application-detail-page.test.tsx`（同ラベル項目のDOM id独立・個別編集）を追加した。`corepack pnpm test`（40ファイル・377テスト）/ `lint` / `tsc -b` / `build` で確認した。
+
 ### 差戻し文面の編集・コピーを実装した（Task 020・コードレビュー指摘#3）
 
 - **申請詳細画面の差戻し文面案（`CheckRun.letterDraft`）を`textarea`で編集し、「コピー」でクリップボードへ書き込めるようにした。** これまでは文字列を表示するだけで、F-3-5「職員が編集・コピー可能であること」を満たしていなかった（`output/task-010-code-review.md`指摘#3）。職員はコピーした文面をメールソフト等へ貼り付けて送付する（自動送信・`mailto`起動はスコープ外のまま）。

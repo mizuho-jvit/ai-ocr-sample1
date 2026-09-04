@@ -14,9 +14,11 @@ import {
   ChecksApiError,
   checksApi as defaultChecksApi,
 } from "../api/checks";
+import { AppStatusBadge } from "../components/app-status-badge";
 import { LetterDraftEditor } from "../components/letter-draft-editor";
 import { MatchCandidateCard } from "../components/match-candidate-card";
-import { APP_STATUS_LABELS, TRIAGE_LABELS } from "../labels";
+import { TriageStamp } from "../components/triage-stamp";
+import { TRIAGE_LABELS } from "../labels";
 
 /** 🔵 Intent: api.md #11の遷移表をそのまま画面のボタン候補にする。API側でも必ず再検証される。 */
 const NEXT_STATUSES: Record<AppStatus, readonly AppStatus[]> = {
@@ -234,7 +236,7 @@ export function ApplicationDetailPage({
         <>
           <div
             style={{
-              alignItems: "baseline",
+              alignItems: "center",
               display: "flex",
               flexWrap: "wrap",
               gap: 10,
@@ -242,15 +244,16 @@ export function ApplicationDetailPage({
               marginBottom: 10,
             }}
           >
-            <h2
-              className="serif"
-              style={{ fontSize: 19, letterSpacing: "0.1em", margin: 0 }}
-            >
-              {application.docType}{" "}
-              <span style={{ color: "var(--ink-soft)", fontSize: 13 }}>
-                — {APP_STATUS_LABELS[application.appStatus]}
-              </span>
-            </h2>
+            <div style={{ alignItems: "center", display: "flex", gap: 12 }}>
+              <TriageStamp size={56} triage={application.triage} />
+              <h2
+                className="serif"
+                style={{ fontSize: 19, letterSpacing: "0.1em", margin: 0 }}
+              >
+                {application.docType}{" "}
+                <AppStatusBadge status={application.appStatus} />
+              </h2>
+            </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {NEXT_STATUSES[application.appStatus].map((toStatus) => (
                 <button
@@ -305,11 +308,9 @@ export function ApplicationDetailPage({
             <div className="card" style={{ padding: 12 }}>
               <h3 style={{ fontSize: 13, margin: "0 0 10px" }}>抽出項目</h3>
               {fields.map((field, index) => (
-                <div className="field-group" key={field.label}>
-                  <label
-                    className="field-label"
-                    htmlFor={`field-${field.label}`}
-                  >
+                // biome-ignore lint/suspicious/noArrayIndexKey: 同じラベルの項目が複数あり得るため(コードレビュー指摘#5)、並び順が変わらないindexをキー・id両方に使う。
+                <div className="field-group" key={index}>
+                  <label className="field-label" htmlFor={`field-${index}`}>
                     {field.label}
                     {field.edited && (
                       <span style={{ color: "var(--vermilion)" }}>
@@ -320,7 +321,7 @@ export function ApplicationDetailPage({
                   </label>
                   <input
                     className="field-input"
-                    id={`field-${field.label}`}
+                    id={`field-${index}`}
                     onChange={(event) =>
                       updateFieldValue(index, event.target.value)
                     }
@@ -377,69 +378,86 @@ export function ApplicationDetailPage({
             </div>
 
             {application.latestCheckRun !== null && (
-              <div className="card" style={{ padding: 12 }}>
-                <h3 style={{ fontSize: 13, margin: "0 0 6px" }}>
-                  業務チェック結果 —{" "}
-                  {TRIAGE_LABELS[application.latestCheckRun.triage]}
-                </h3>
-                <p style={{ fontSize: 13, margin: "0 0 10px" }}>
-                  {application.latestCheckRun.triageReason}
-                </p>
-                {application.latestCheckRun.consistency.length > 0 && (
-                  <ul
-                    style={{ fontSize: 12, margin: "0 0 8px", paddingLeft: 18 }}
+              <div
+                className="card"
+                style={{ display: "flex", gap: 12, padding: 12 }}
+              >
+                <TriageStamp
+                  size={52}
+                  triage={application.latestCheckRun.triage}
+                />
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ fontSize: 13, margin: "0 0 6px" }}>
+                    業務チェック結果 —{" "}
+                    {TRIAGE_LABELS[application.latestCheckRun.triage]}
+                  </h3>
+                  <p style={{ fontSize: 13, margin: "0 0 10px" }}>
+                    {application.latestCheckRun.triageReason}
+                  </p>
+                  {application.latestCheckRun.consistency.length > 0 && (
+                    <ul
+                      style={{
+                        fontSize: 12,
+                        margin: "0 0 8px",
+                        paddingLeft: 18,
+                      }}
+                    >
+                      {application.latestCheckRun.consistency.map(
+                        (issue, index) => (
+                          // biome-ignore lint/suspicious/noArrayIndexKey: サーバーから安定したidを持たない一覧のため。
+                          <li key={index}>
+                            [{issue.labels.join("・")}] {issue.message}
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                  )}
+                  {application.latestCheckRun.deficiencies.length > 0 && (
+                    <ul
+                      style={{
+                        fontSize: 12,
+                        margin: "0 0 8px",
+                        paddingLeft: 18,
+                      }}
+                    >
+                      {application.latestCheckRun.deficiencies.map(
+                        (deficiency, index) => (
+                          // biome-ignore lint/suspicious/noArrayIndexKey: サーバーから安定したidを持たない一覧のため。
+                          <li key={index}>
+                            [{deficiency.label}] {deficiency.message}
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                  )}
+                  {application.latestCheckRun.letterDraft !== null && (
+                    // 再実施でCheckRunが変わったら編集途中の内容を捨てて新しい下書きへ置き換える（決定#34）。
+                    <LetterDraftEditor
+                      draft={application.latestCheckRun.letterDraft}
+                      key={application.latestCheckRun.id}
+                    />
+                  )}
+                  <button
+                    className="btn btn-ghost btn-small"
+                    onClick={() => void handleToggleHistory()}
+                    style={{ marginTop: 10 }}
+                    type="button"
                   >
-                    {application.latestCheckRun.consistency.map(
-                      (issue, index) => (
-                        // biome-ignore lint/suspicious/noArrayIndexKey: サーバーから安定したidを持たない一覧のため。
-                        <li key={index}>
-                          [{issue.labels.join("・")}] {issue.message}
+                    {checkRunHistory !== null
+                      ? "履歴を閉じる"
+                      : "業務チェック履歴を表示"}
+                  </button>
+                  {checkRunHistory !== null && (
+                    <ul style={{ fontSize: 12, marginTop: 8, paddingLeft: 18 }}>
+                      {checkRunHistory.map((run) => (
+                        <li key={run.id}>
+                          {run.createdAt} — {TRIAGE_LABELS[run.triage]}（
+                          {run.createdBy.name}）
                         </li>
-                      ),
-                    )}
-                  </ul>
-                )}
-                {application.latestCheckRun.deficiencies.length > 0 && (
-                  <ul
-                    style={{ fontSize: 12, margin: "0 0 8px", paddingLeft: 18 }}
-                  >
-                    {application.latestCheckRun.deficiencies.map(
-                      (deficiency, index) => (
-                        // biome-ignore lint/suspicious/noArrayIndexKey: サーバーから安定したidを持たない一覧のため。
-                        <li key={index}>
-                          [{deficiency.label}] {deficiency.message}
-                        </li>
-                      ),
-                    )}
-                  </ul>
-                )}
-                {application.latestCheckRun.letterDraft !== null && (
-                  // 再実施でCheckRunが変わったら編集途中の内容を捨てて新しい下書きへ置き換える（決定#34）。
-                  <LetterDraftEditor
-                    draft={application.latestCheckRun.letterDraft}
-                    key={application.latestCheckRun.id}
-                  />
-                )}
-                <button
-                  className="btn btn-ghost btn-small"
-                  onClick={() => void handleToggleHistory()}
-                  style={{ marginTop: 10 }}
-                  type="button"
-                >
-                  {checkRunHistory !== null
-                    ? "履歴を閉じる"
-                    : "業務チェック履歴を表示"}
-                </button>
-                {checkRunHistory !== null && (
-                  <ul style={{ fontSize: 12, marginTop: 8, paddingLeft: 18 }}>
-                    {checkRunHistory.map((run) => (
-                      <li key={run.id}>
-                        {run.createdAt} — {TRIAGE_LABELS[run.triage]}（
-                        {run.createdBy.name}）
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             )}
 

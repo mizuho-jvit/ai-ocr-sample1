@@ -7,7 +7,9 @@ import type {
 } from "../../worker/types/contracts";
 import type { ApplicationsApi } from "../api/applications";
 import { toErrorMessage } from "../api/applications";
-import { APP_STATUS_LABELS, TRIAGE_LABELS } from "../labels";
+import { AppStatusBadge } from "../components/app-status-badge";
+import { TriageStamp } from "../components/triage-stamp";
+import { APP_STATUS_LABELS } from "../labels";
 
 type LinkedFilter = "all" | "linked" | "unlinked";
 
@@ -200,10 +202,10 @@ export function ApplicationListPage({
                   >
                     <td style={{ padding: "8px 12px" }}>{item.docType}</td>
                     <td style={{ padding: "8px 12px" }}>
-                      {APP_STATUS_LABELS[item.appStatus]}
+                      <AppStatusBadge status={item.appStatus} />
                     </td>
                     <td style={{ padding: "8px 12px" }}>
-                      {item.triage ? TRIAGE_LABELS[item.triage] : "—"}
+                      <TriageStamp size={32} triage={item.triage} />
                     </td>
                     <td style={{ padding: "8px 12px" }}>
                       {item.createdBy.name}

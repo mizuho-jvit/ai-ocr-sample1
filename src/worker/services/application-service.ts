@@ -352,22 +352,42 @@ export function createApplicationService(
       const currentFields = JSON.parse(
         application.fieldsJson,
       ) as ApplicationField[];
-      const nextValueByLabel = new Map(
-        input.fields.map((field) => [field.label, field.value]),
-      );
+
+      /**
+       * 🔵 Intent: コードレビュー指摘#5。ラベルだけをキーにした`Map`だと、同じラベルを持つ
+       * 項目が複数ある帳票(例: 氏名欄が2箇所)で、後勝ちの1件が同ラベル全項目へ適用されてしまう。
+       * 画面(`ocr-page.tsx`・`application-detail-page.tsx`)は常に`application.fields`と同じ
+       * 並び順で全項目を送り返すため、`input.fields`をその順で1件ずつ消費し、まだ対応付けて
+       * いない同ラベルの最初の項目へ割り当てる。これにより出現順で位置を復元しつつ、既存の
+       * 部分更新(未指定ラベルはそのまま)にも対応する。
+       */
+      const consumed = new Array(currentFields.length).fill(false);
+      const nextValueByIndex = new Map<number, string>();
+      for (const incoming of input.fields) {
+        const matchIndex = currentFields.findIndex(
+          (field, index) => !consumed[index] && field.label === incoming.label,
+        );
+        if (matchIndex === -1) {
+          continue;
+        }
+        consumed[matchIndex] = true;
+        nextValueByIndex.set(matchIndex, incoming.value);
+      }
 
       // api.md #10: confidenceは変更しない。値が変わった項目、または既に編集済みの項目はeditedをtrueで維持する。
-      const nextFields: ApplicationField[] = currentFields.map((field) => {
-        const nextValue = nextValueByLabel.get(field.label);
-        if (nextValue === undefined) {
-          return field;
-        }
-        return {
-          ...field,
-          edited: field.edited || nextValue !== field.value,
-          value: nextValue,
-        };
-      });
+      const nextFields: ApplicationField[] = currentFields.map(
+        (field, index) => {
+          const nextValue = nextValueByIndex.get(index);
+          if (nextValue === undefined) {
+            return field;
+          }
+          return {
+            ...field,
+            edited: field.edited || nextValue !== field.value,
+            value: nextValue,
+          };
+        },
+      );
       const editedCount = nextFields.filter((field) => field.edited).length;
 
       await repos.applications.update(

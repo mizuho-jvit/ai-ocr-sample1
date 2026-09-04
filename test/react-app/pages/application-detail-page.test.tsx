@@ -119,6 +119,32 @@ describe("ApplicationDetailPage", () => {
     expect(await screen.findByText(/修正済/)).toBeTruthy();
   });
 
+  it("keeps each occurrence of a duplicated label independently editable (コードレビュー指摘#5)", async () => {
+    const application = baseApplication({
+      fields: [
+        { confidence: 1, edited: false, label: "氏名", value: "仙台 一郎" },
+        { confidence: 1, edited: false, label: "氏名", value: "" },
+      ],
+    });
+    const api = fakeApi({ get: vi.fn().mockResolvedValue(application) });
+    render(
+      <ApplicationDetailPage
+        api={api}
+        applicationId="app_1"
+        onBack={vi.fn()}
+      />,
+    );
+    const [first, second] = (await screen.findAllByLabelText(
+      "氏名",
+    )) as HTMLInputElement[];
+    expect(first.id).not.toBe(second.id);
+
+    fireEvent.change(second, { target: { value: "仙台 次郎" } });
+
+    expect(first.value).toBe("仙台 一郎");
+    expect(second.value).toBe("仙台 次郎");
+  });
+
   it("only offers the transitions allowed from the current status (api.md #11)", async () => {
     const api = fakeApi({
       get: vi

@@ -401,7 +401,8 @@ export function OcrPage({
                   field={field}
                   index={index}
                   isFirst={index === 0}
-                  key={field.label}
+                  // biome-ignore lint/suspicious/noArrayIndexKey: 同じラベルの項目が複数あり得るため(コードレビュー指摘#5)、並び順が変わらないindexをキーに使う。
+                  key={index}
                   onChange={updateField}
                   onConfirm={confirmField}
                 />

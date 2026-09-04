@@ -38,7 +38,9 @@ describe("ApplicationListPage", () => {
 
     expect(await screen.findByText("利用者登録申請書")).toBeTruthy();
     expect(screen.getByRole("cell", { name: "審査中" })).toBeTruthy();
-    expect(screen.getByRole("cell", { name: "要審査" })).toBeTruthy();
+    // TriageStamp(判子スタンプ)はaria-label="AI判定: <結果>"を持つため、セルの
+    // アクセシブルネームもそれに置き換わる(role="cell"名ではなくスタンプ自体で検証する)。
+    expect(screen.getByLabelText("AI判定: 要審査")).toBeTruthy();
     expect(screen.getByRole("cell", { name: "窓口 花子" })).toBeTruthy();
     expect(screen.getByRole("cell", { name: "未紐付け" })).toBeTruthy();
     expect(list).toHaveBeenCalledWith({ page: 1 });
