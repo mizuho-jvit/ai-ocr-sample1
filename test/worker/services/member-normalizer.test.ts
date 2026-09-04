@@ -161,6 +161,33 @@ describe("normalizeMemberInput — birth date (和暦→西暦)", () => {
     );
     expect(result.birthDateNormalized).toBe("1980-01-01");
   });
+
+  it("removes internal whitespace regardless of width (1980年 1月 1日)", () => {
+    const result = normalizeMemberInput(
+      identity({ birthDate: "1980年 1月 1日", name: "会員" }),
+    );
+    expect(result.birthDateNormalized).toBe("1980-01-01");
+  });
+
+  it("removes internal full-width whitespace (昭和55年　3月　10日)", () => {
+    const result = normalizeMemberInput(
+      identity({ birthDate: "昭和55年　3月　10日", name: "会員" }),
+    );
+    expect(result.birthDateNormalized).toBe("1980-03-10");
+  });
+
+  it("accepts an 8-digit compact seireki format (19800101)", () => {
+    const result = normalizeMemberInput(
+      identity({ birthDate: "19800101", name: "会員" }),
+    );
+    expect(result.birthDateNormalized).toBe("1980-01-01");
+  });
+
+  it("throws INVALID_DATE for an 8-digit compact value with a nonexistent date (19801301)", () => {
+    expect(() =>
+      normalizeMemberInput(identity({ birthDate: "19801301", name: "会員" })),
+    ).toThrowError("不正な日付です。");
+  });
 });
 
 describe("normalizeMemberInput — birth date existence check (年月日の実在性)", () => {

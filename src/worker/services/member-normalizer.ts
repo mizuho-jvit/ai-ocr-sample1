@@ -109,6 +109,8 @@ function assertWithinEraBoundary(
 const WAREKI_PATTERN =
   /^(明治|大正|昭和|平成|令和|[mtshr])(元|\d{1,2})[年./-](\d{1,2})[月./-]?(\d{1,2})日?$/i;
 const SEIREKI_PATTERN = /^(\d{4})[年./-](\d{1,2})[月./-]?(\d{1,2})日?$/;
+/** 🔵 Intent: 区切り文字を持たない8桁連続数字（YYYYMMDD）のOCR結果を受け付ける。 */
+const SEIREKI_COMPACT_PATTERN = /^(\d{4})(\d{2})(\d{2})$/;
 
 /**
  * 🔵 Intent: OCR/IME由来でハイフンの代わりに使われがちなダッシュ系文字
@@ -176,7 +178,9 @@ function normalizeBirthDate(birthDate: string | null): string | null {
   if (birthDate === null) {
     return null;
   }
-  const normalized = foldDashVariants(birthDate.normalize("NFKC")).trim();
+  const normalized = stripWhitespace(
+    foldDashVariants(birthDate.normalize("NFKC")),
+  );
 
   const warekiMatch = normalized.match(WAREKI_PATTERN);
   if (warekiMatch) {
@@ -205,6 +209,23 @@ function normalizeBirthDate(birthDate: string | null): string | null {
   const seirekiMatch = normalized.match(SEIREKI_PATTERN);
   if (seirekiMatch) {
     const [, year, month, day] = seirekiMatch as unknown as [
+      string,
+      string,
+      string,
+      string,
+    ];
+    const yearNumber = Number(year);
+    const monthNumber = Number(month);
+    const dayNumber = Number(day);
+    if (!isValidCalendarDate(yearNumber, monthNumber, dayNumber)) {
+      invalidDate();
+    }
+    return `${yearNumber}-${pad2(monthNumber)}-${pad2(dayNumber)}`;
+  }
+
+  const compactMatch = normalized.match(SEIREKI_COMPACT_PATTERN);
+  if (compactMatch) {
+    const [, year, month, day] = compactMatch as unknown as [
       string,
       string,
       string,
