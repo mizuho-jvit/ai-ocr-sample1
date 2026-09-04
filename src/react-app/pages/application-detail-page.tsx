@@ -14,7 +14,10 @@ import {
   ChecksApiError,
   checksApi as defaultChecksApi,
 } from "../api/checks";
-import { AppStatusBadge } from "../components/app-status-badge";
+import {
+  APP_STATUS_BADGE_COLOR,
+  AppStatusBadge,
+} from "../components/app-status-badge";
 import { LetterDraftEditor } from "../components/letter-draft-editor";
 import { MatchCandidateCard } from "../components/match-candidate-card";
 import { TriageStamp } from "../components/triage-stamp";
@@ -256,11 +259,18 @@ export function ApplicationDetailPage({
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {NEXT_STATUSES[application.appStatus].map((toStatus) => (
+                // 🔵 Intent: プロトタイプ`ai-ocr-demo.jsx`と同じく、遷移先ステータスごとの色で
+                // ボタンを塗り分ける（統一の黒ではなく、承認=緑・差戻し=朱色等）。
                 <button
-                  className="btn btn-primary btn-small"
+                  className="btn btn-small"
                   disabled={isChangingStatus}
                   key={toStatus}
                   onClick={() => void handleChangeStatus(toStatus)}
+                  style={{
+                    background: "#fff",
+                    border: `1px solid ${APP_STATUS_BADGE_COLOR[toStatus]}`,
+                    color: APP_STATUS_BADGE_COLOR[toStatus],
+                  }}
                   type="button"
                 >
                   {NEXT_STATUS_LABELS[toStatus]}

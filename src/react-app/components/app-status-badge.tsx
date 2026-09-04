@@ -1,8 +1,11 @@
 import type { AppStatus } from "../../worker/types/contracts";
 import { APP_STATUS_LABELS } from "../labels";
 
-/** プロトタイプ`ai-ocr-demo.jsx`のAPP_STATUS_COLORをCSSカスタムプロパティで踏襲する。 */
-const APP_STATUS_BADGE_COLOR: Record<AppStatus, string> = {
+/**
+ * プロトタイプ`ai-ocr-demo.jsx`のAPP_STATUS_COLORをCSSカスタムプロパティで踏襲する。
+ * ステータス変更ボタンの配色（`application-detail-page.tsx`）にも同じ対応表を使うため公開する。
+ */
+export const APP_STATUS_BADGE_COLOR: Record<AppStatus, string> = {
   approved: "var(--ok-green)",
   received: "var(--ink-soft)",
   returned: "var(--vermilion)",

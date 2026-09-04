@@ -165,6 +165,32 @@ describe("ApplicationDetailPage", () => {
     expect(screen.queryByRole("button", { name: "受付にする" })).toBeNull();
   });
 
+  it("colors each status-transition button by its destination status (プロトタイプ準拠)", async () => {
+    const api = fakeApi({
+      get: vi
+        .fn()
+        .mockResolvedValue(baseApplication({ appStatus: "under_review" })),
+    });
+    render(
+      <ApplicationDetailPage
+        api={api}
+        applicationId="app_1"
+        onBack={vi.fn()}
+      />,
+    );
+    await screen.findByLabelText("氏名");
+
+    const approveButton = screen.getByRole("button", {
+      name: "承認する",
+    }) as HTMLButtonElement;
+    const returnButton = screen.getByRole("button", {
+      name: "差戻しにする",
+    }) as HTMLButtonElement;
+
+    expect(approveButton.style.color).toBe("var(--ok-green)");
+    expect(returnButton.style.color).toBe("var(--vermilion)");
+  });
+
   it("shows no transition buttons for an approved (confirmed) application", async () => {
     const api = fakeApi({
       get: vi
