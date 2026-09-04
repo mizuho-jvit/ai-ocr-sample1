@@ -7,6 +7,7 @@ import {
 } from "../observability/operation-trace";
 import type {
   ApplicationId,
+  MatchCandidateId,
   PeriodKey,
   ScopedDb,
   ScopedWriteOp,
@@ -283,6 +284,23 @@ export function whereEquals(
     columnName
   ];
   return drizzleWhere(eq(column, value));
+}
+
+/**
+ * 🔵 Intent: コードレビュー指摘。同一申請で2件のdecideMatch(merged)がほぼ同時に来ると、
+ * 「既存merged行をJS側でSELECTしてから戻す」実装では両方が「まだmergedは無い」を読んで
+ * しまい、merged行が2件残る（merged/rejected/staleは再判断不可のため以後直せない）。
+ * reserveCheckRunSlot・incrementUsageCounterと同じ理由で事前SELECTを避け、
+ * このSqlExprをUPDATEのWHEREへ埋め込む1文にする。batch実行時点でDB上に実在する
+ * merged行だけが対象になるため、ほぼ同時に書き込まれても後続のUPDATEが必ず先行分を拾う。
+ */
+export function whereOtherMergedMatchCandidates(
+  applicationId: ApplicationId,
+  excludeCandidateId: MatchCandidateId,
+): SqlExpr {
+  return drizzleWhere(
+    sql`${matchCandidates.applicationId} = ${applicationId} AND ${matchCandidates.status} = 'merged' AND ${matchCandidates.id} != ${excludeCandidateId}`,
+  );
 }
 
 export interface LoginFailureState {

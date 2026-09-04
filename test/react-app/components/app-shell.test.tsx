@@ -155,4 +155,39 @@ describe("AppShell", () => {
     ).toBeTruthy();
     expect(logout).toHaveBeenCalledTimes(2);
   });
+
+  // Task 010: ルーターは導入しないが、ホーム・申請状況一覧はナビメニューから
+  // 切り替え表示できる（他の項目はまだ画面が無いためdisabledのまま）。
+  it("switches the main screen between home and the application list via the nav menu", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ items: [], page: 1, perPage: 20, total: 0 }),
+          {
+            headers: { "Content-Type": "application/json" },
+            status: 200,
+          },
+        ),
+      ),
+    );
+    try {
+      renderShell(session("staff", false));
+      await screen.findByText(/担当者/);
+      expect(screen.getByText("帳票の画像を選択")).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "申請状況一覧" }));
+
+      expect(
+        await screen.findByRole("heading", { name: "申請状況一覧" }),
+      ).toBeTruthy();
+      expect(screen.queryByText("帳票の画像を選択")).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "ホーム" }));
+
+      expect(await screen.findByText("帳票の画像を選択")).toBeTruthy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

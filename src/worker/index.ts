@@ -17,6 +17,7 @@ import {
   finalizeOperationTrace,
   type OperationTrace,
 } from "./observability/operation-trace";
+import { createApplicationRoutes } from "./routes/applications";
 import {
   createProtectedAuthRoutes,
   createPublicAuthRoutes,
@@ -28,6 +29,10 @@ import {
   createOcrRoutes,
 } from "./routes/ocr";
 import { createUsageRoutes } from "./routes/usage";
+import {
+  type ApplicationService,
+  createApplicationService,
+} from "./services/application-service";
 import { createAuthService } from "./services/auth";
 import {
   type BusinessCheckService,
@@ -99,6 +104,7 @@ export function createApp(
   providedOcrPipeline?: OcrPipeline,
   providedImageStorage?: ImageStorage,
   providedBusinessCheck?: BusinessCheckService,
+  providedApplicationService?: ApplicationService,
 ): Hono<AppHonoEnv> {
   const app = new Hono<AppHonoEnv>();
 
@@ -137,6 +143,11 @@ export function createApp(
           trace,
           usage,
         }),
+    );
+    context.set(
+      "applicationService",
+      providedApplicationService ??
+        createApplicationService({ config, repository }),
     );
     try {
       await executeOperation(
@@ -179,8 +190,11 @@ export function createApp(
   protectedApi.route("/ocr", createOcrRoutes());
   protectedApi.route("/checks", createCheckRoutes());
   protectedApi.route("/images", createImageRoutes());
-  // `/applications/:id/image` のみここで登録する。Task 010 で `/api/applications` の
-  // 残りのCRUDを追加する際、api.md の登録順序の注意（:id より前に具体パスを置く）に従う。
+  // api.md #7〜13（一覧・詳細・項目編集・状態遷移・CheckRun履歴・名寄せ判断）と、
+  // Task 007由来の #15（DELETE .../image）を同じ `/applications` prefixへ併せて登録する。
+  // どちらも `/:id` 配下の具体パスのみで、export.csv（Task 013・#8）のような
+  // `/:id` と衝突する静的パスは無いため登録順序に依存しない。
+  protectedApi.route("/applications", createApplicationRoutes());
   protectedApi.route("/applications", createApplicationImageRoutes());
   // app.route はサブアプリのスナップショットを再生するため、搭載は登録の後に行う。
   app.route("/api", protectedApi);

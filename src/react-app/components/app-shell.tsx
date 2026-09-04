@@ -1,10 +1,26 @@
 import { useState } from "react";
 
 import type { Role, SessionResponse } from "../../worker/types/contracts";
+import { applicationsApi } from "../api/applications";
 import { toErrorMessage } from "../api/auth";
 import { ocrApi } from "../api/ocr";
+import { ApplicationDetailPage } from "../pages/application-detail-page";
+import { ApplicationListPage } from "../pages/application-list-page";
 import { OcrPage } from "../pages/ocr-page";
 import { useAuth } from "./auth-guard";
+
+/**
+ * 🟡 Intent: URLベースのルーターは導入せず（決定は未確定事項なし・npm依存を増やさない
+ * 既存方針に合わせる）、画面一覧の各画面をここへ切り替え表示するだけの内部状態にする。
+ * 「申請詳細」はナビメニューを持たず、一覧からの選択でのみ遷移する。
+ */
+export type Screen = "home" | "applications" | "application-detail";
+
+/** ナビメニューから直接遷移できる画面（他はTask 010の範囲外でまだ無効のまま）。 */
+const NAVIGABLE_SCREENS: ReadonlySet<string> = new Set([
+  "home",
+  "applications",
+]);
 
 interface NavItem {
   adminOnly: boolean;
@@ -69,13 +85,17 @@ const ROLE_LABELS: Record<Role, string> = {
 export interface AppNavProps {
   // `role` を単独のpropにするとJSX上のARIA属性と衝突するため、セッションごと渡す。
   session: SessionResponse;
+  activeScreen?: Screen;
+  onNavigate?: (screen: Screen) => void;
 }
 
 /**
  * 🔵 Intent: roleとfeatureでメニューを出し分ける。これは表示上の配慮にすぎず、
  * API側のロール認可（F-1-11〜15）の代替にはしない。admin専用APIはWorkerで再検証する。
+ * 🟡 Intent: Task 010で画面が揃った項目（ホーム・申請状況一覧）だけ`onNavigate`経由で
+ * 有効化する。他の項目は後続タスクで画面が揃うまでdisabledのまま。
  */
-export function AppNav({ session }: AppNavProps) {
+export function AppNav({ session, activeScreen, onNavigate }: AppNavProps) {
   const items = NAV_ITEMS.filter(
     (item) =>
       (!item.adminOnly || session.user.role === "admin") &&
@@ -84,18 +104,24 @@ export function AppNav({ session }: AppNavProps) {
 
   return (
     <nav aria-label="メインメニュー" className="app-nav">
-      {items.map((item) => (
-        // 遷移先の画面は後続タスクで実装するため、まだ無効化しておく。
-        <button
-          className="app-nav-item"
-          disabled
-          id={`nav-${item.id}`}
-          key={item.label}
-          type="button"
-        >
-          {item.label}
-        </button>
-      ))}
+      {items.map((item) => {
+        const navigable = onNavigate && NAVIGABLE_SCREENS.has(item.id);
+        return (
+          <button
+            aria-current={activeScreen === item.id ? "page" : undefined}
+            className="app-nav-item"
+            disabled={!navigable}
+            id={`nav-${item.id}`}
+            key={item.label}
+            onClick={
+              navigable ? () => onNavigate(item.id as Screen) : undefined
+            }
+            type="button"
+          >
+            {item.label}
+          </button>
+        );
+      })}
     </nav>
   );
 }
@@ -109,6 +135,27 @@ export function AppShell() {
   const { logout, session } = useAuth();
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [screen, setScreen] = useState<Screen>("home");
+  const [selectedApplicationId, setSelectedApplicationId] = useState<
+    string | null
+  >(null);
+
+  function handleNavigate(nextScreen: Screen) {
+    setScreen(nextScreen);
+    if (nextScreen !== "application-detail") {
+      setSelectedApplicationId(null);
+    }
+  }
+
+  function handleSelectApplication(applicationId: string) {
+    setSelectedApplicationId(applicationId);
+    setScreen("application-detail");
+  }
+
+  function handleBackToList() {
+    setSelectedApplicationId(null);
+    setScreen("applications");
+  }
 
   // 成功時はこのコンポーネントが差し替わるため、送信中フラグは戻さない。
   async function handleLogout() {
@@ -159,13 +206,26 @@ export function AppShell() {
           </button>
         </div>
       )}
-      <AppNav session={session} />
-      {/*
-       * 🟡 Intent: ルーターは未導入のため、唯一実装済みの画面（帳票読取）を常時表示する。
-       * 他のメニュー項目は後続タスクで画面が揃うまで disabled のまま。
-       */}
+      <AppNav
+        activeScreen={screen}
+        onNavigate={handleNavigate}
+        session={session}
+      />
       <main style={{ marginBottom: 24 }}>
-        <OcrPage api={ocrApi} />
+        {screen === "home" && <OcrPage api={ocrApi} />}
+        {screen === "applications" && (
+          <ApplicationListPage
+            api={applicationsApi}
+            onSelectApplication={handleSelectApplication}
+          />
+        )}
+        {screen === "application-detail" && selectedApplicationId !== null && (
+          <ApplicationDetailPage
+            api={applicationsApi}
+            applicationId={selectedApplicationId}
+            onBack={handleBackToList}
+          />
+        )}
       </main>
       <footer className="app-footer">
         <ul>

@@ -2,6 +2,28 @@
 
 <!-- 予約ファイル。フロントマターは付けない。日付見出し（ISO 8601）ごとに新しいものを上に追記する。 -->
 
+## 2026-09-03
+
+### 申請管理と名寄せ判断画面を実装した（Task 010）
+
+- **`GET /api/applications`（一覧）・`GET .../:id`（詳細）・`PATCH .../:id/fields`（項目編集）・`POST .../:id/status`（状態遷移）・`GET .../:id/check-runs`（履歴）・`PATCH .../:id/match-candidates/:candidateId`（名寄せ判断）をapi.md #7・#9〜13どおりに実装した。** ルートハンドラ（`src/worker/routes/applications.ts`）はリクエストの検証とセッション解決だけを行い、業務ロジックは新設した`ApplicationService`（`src/worker/services/application-service.ts`）へ委ねた。タスクファイルのInterfacesが`changeApplicationStatus`/`decideMatch`をサービス関数の形で示していたため、`routes/checks.ts`と同じ「ルートは薄く、サービスに実体を置く」構成に合わせた。
+- **状態遷移はapi.md #11の許可表をそのままコード化し、`AppStatusHistory`への記録と同一のD1トランザクションで実行する。** 承認時に紐付く会員が`pending`なら`active`へ昇格させ`StatusHistory`にも記録する（F-4-3）。昇格の`reason`は職員が入力する通常の会員状態変更（F-5-7）と異なり自動処理のため、定型文「承認に伴う自動昇格（F-4-3）」を記録する（[決定#30](./requirements/decisions.md)）。
+- **一覧のフィルタ・ページングまわりで2件の実装時判断を行い、wikiへ正典化した（[決定#29](./requirements/decisions.md)）。** F-4-11「要審査のみ」は`Triage`の`needs_review`値そのものを対象とし、ページングは`page`既定1・`perPage`既定20（上限100）とした。`triage`は`Application`に直接持たず`CheckRun`側にあるため、一覧はテナント内の`applications`・`check_runs`・`staff_users`・`members`を一括取得しMapで突き合わせる方式にした（デモ規模のテナント1件を前提に、申請件数ぶんのN+1クエリを避けるための割り切り）。
+- **`editedCount`は保存の都度、その時点で`edited=true`の項目数を数え直す。** 一度編集された項目は元の値に戻しても`edited`を`false`へ戻さない（[決定#30](./requirements/decisions.md)）。`confidence`はAIの出力値のため`PATCH .../fields`では一切変更しない。
+- **`PATCH .../match-candidates/:candidateId`はF-6-8の3操作（同一人物として紐付け・別人として登録・保留）を実装し、`merged`のときだけ`Application.memberId`を設定する。** 応答の`candidate`は、一覧表示から除外される`rejected`/`stale`（決定#28）でも単独では返す必要があったため、`application-view.ts`の候補行変換ロジックを`buildMatchCandidateView`（単一行）と`buildMatchCandidateViews`（一覧・rejected/stale除外）に分割した。
+- **SPA側にルーターは導入せず、`AppShell`のuseStateで画面を切り替える方式にした（[決定#31](./requirements/decisions.md)）。** ナビメニューの「ホーム」「申請状況一覧」だけを有効化し、他の項目（会員一覧・重複疑いリスト・スタッフ管理・デモデータ初期化）はTask 011以降で画面が揃うまでdisabledのまま据え置いた。申請詳細はナビメニューを持たず、一覧の「詳細」ボタンからのみ遷移する。
+- **申請詳細画面はF-6-7の候補カードUI（申請データと会員データを左右に並べ差分をハイライト）を`MatchCandidateCard`（`src/react-app/components/match-candidate-card.tsx`）として切り出した。** 500行ルールで`application-detail-page.tsx`から分離した形だが、業務チェック結果の表示・項目編集・状態遷移ボタンと合わせて1画面（申請詳細）に統合している。F-6-7自体は「業務チェック結果画面」の要件だが、候補判断APIが`/api/applications/:id/match-candidates/*`に置かれている（決定#2）ことに合わせ、Task 010の範囲である申請詳細側に実装した。
+- Worker側は`test/worker/services/application-service-{read,workflow}.test.ts`（実D1・34件）と`test/worker/routes/applications-{query,mutation}.test.ts`（サービスをDIでフェイク化・17件）に分割した（500行ルール）。SPA側は`test/react-app/{api/applications,pages/application-list-page,pages/application-detail-page}.test.tsx`を追加し、`app-shell.test.tsx`にナビ切り替えのテストを1件足した。`corepack pnpm test`（37ファイル・348テスト）/ `lint` / `build` で確認した。
+
+### コードレビュー指摘を反映した（Task 010・名寄せ判断の状態遷移未検証）
+
+- **`PATCH /api/applications/:id/match-candidates/:candidateId`が候補の現在状態を検証せず、`merged`／`rejected`／`stale`の候補を任意の判断結果で上書きできる欠陥を修正した。** `decideMatch`（`application-service.ts`）は候補が`pending`／`hold`のときだけ判断を受け付け、それ以外は`409 INVALID_TRANSITION`を返す。UIの候補カードは既にこれらの状態でボタンを隠していたが、API単体では検証していなかった。
+- **候補Aが`merged`済みの状態で候補Bを`merged`にした場合の扱いをユーザーへ確認し、「後勝ちで差し替える」方針を採用した（[決定#32](./requirements/decisions.md)）。** F-4-12（後着優先・排他制御なし）の既存方針に合わせ、Bをmergedにする際は同じ申請の既存merged候補Aを`pending`（`decidedById`／`decidedAt`もクリア）へ戻し、`Application.memberId`をBへ差し替える。これにより「申請1件につきmerged候補は常に高々1件」という不変条件を保つ（修正前は候補A・Bの両方が`merged`のまま残り、`Application.memberId`は後から判断した方だけを指す不整合があった）。
+- **さらにユーザーとの検討で、承認済み（`appStatus: approved`）の申請には名寄せ判断そのものを禁止する結論に至った（決定#32を更新）。** 当初は「後勝ちの差し替えを承認後も許可しつつ、必要ならF-4-3の昇格処理を`decideMatch`側でも追随させる」案を検討したが、`members.status`のpending→active昇格（F-4-3）は戻す経路が無い不可逆な操作であり、承認後に紐付け先が変わると「昇格済みだがどの申請からも参照されない会員」が発生し修復できないと判明した。F-4-2「承認は確定状態」の原則どおり、承認後は`decideMatch`自体を`409 INVALID_TRANSITION`で拒否するようにした。承認前（受付／審査中／差戻し）はF-4-3の昇格が一度も発生していないため、後勝ちの差し替えを引き続き許可しても会員側への副作用は無い。UI（`MatchCandidateCard`）の判断ボタンも`appStatus !== "approved"`の条件を追加した。
+- `test/worker/services/application-service-workflow.test.ts`へ、pending/hold以外の候補を再判断できないことの検証（`it.each`で`merged`/`rejected`/`stale`の3パターン）・後勝ち差し替えの検証・承認済み申請への判断を拒否する検証を追加した。`test/react-app/pages/application-detail-page.test.tsx`にも承認済み申請で判断ボタンを出さないことの検証を追加した。
+- **同じ会員へ複数の申請を独立に紐付けられること（会員は`applications`を複数持ちうる・F-5-6）をユーザーへ確認され、`decideMatch`の「同一申請内でmerged候補は高々1件」（決定#32）というスコープが申請をまたがないことを検証で固定した。** 1件目の申請の承認でF-4-3の昇格が起きた後、2件目の申請を同じ会員へ紐付けても`members.status`は変わらず（既にactive）、`status_history`が二重に記録されないことを確認した。
+- `application-service-workflow.test.ts`が542行（500行ルール超過）になったため、`application-service-status.test.ts`（changeStatus）と`application-service-match.test.ts`（listCheckRuns・decideMatch）に分割した。`corepack pnpm test`（38ファイル・355テスト）/ `lint` / `tsc -b` / `build` で確認した。
+
 ## 2026-09-02
 
 ### Task 008の名寄せ条件・生年月日正規化をコードレビュー指摘に基づき修正した

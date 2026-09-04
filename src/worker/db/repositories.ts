@@ -309,3 +309,5 @@ export function whereFieldEquals<
 ): SqlExpr {
   return whereEquals(tableName, columnName, value);
 }
+
+export { whereOtherMergedMatchCandidates } from "./client";

@@ -27,14 +27,15 @@ import type {
   Triage,
 } from "../types";
 
-type ApplicationRow = typeof applications.$inferSelect;
+export type ApplicationRow = typeof applications.$inferSelect;
 type StaffRow = typeof staffUsers.$inferSelect;
 type MemberRow = typeof members.$inferSelect;
 type CheckRunRow = typeof checkRuns.$inferSelect;
 type MatchCandidateRow = typeof matchCandidates.$inferSelect;
 type AppStatusHistoryRow = typeof appStatusHistory.$inferSelect;
 
-function toStaffUserSummary(staff: StaffRow): StaffUserSummary {
+/** 🟡 Intent: Task 010の一覧（`GET /api/applications`）が同じ変換をN+1なしで再利用する。 */
+export function toStaffUserSummary(staff: StaffRow): StaffUserSummary {
   return {
     email: staff.email,
     id: staff.id,
@@ -44,7 +45,7 @@ function toStaffUserSummary(staff: StaffRow): StaffUserSummary {
   };
 }
 
-function toMemberSummary(member: MemberRow): MemberSummary {
+export function toMemberSummary(member: MemberRow): MemberSummary {
   return {
     birthDate: member.birthDate,
     id: member.id,
@@ -128,6 +129,34 @@ async function optionalCheckRunView(
 }
 
 /**
+ * 🟡 Intent: Task 010（`PATCH .../match-candidates/:candidateId`）が判断直後の1件を
+ * 応答へ含める際、一覧用フィルタ（rejected/stale除外）を経由せず単独で組み立てられるよう
+ * 行変換だけを独立させた。`buildMatchCandidateViews`はこれを一覧向けに再利用する。
+ */
+export async function buildMatchCandidateView(
+  repositories: TenantScopedRepositories,
+  row: MatchCandidateRow,
+): Promise<MatchCandidateView> {
+  const member = await repositories.members.findOne(
+    whereFieldEquals("members", "id", row.memberId),
+  );
+  if (!member) {
+    throw new Error(`members row not found for id ${row.memberId}`);
+  }
+  const decidedBy = await optionalStaffSummary(repositories, row.decidedById);
+  return {
+    aiLikelihood: row.aiLikelihood as Likelihood | null,
+    aiReason: row.aiReason,
+    decidedAt: row.decidedAt,
+    decidedBy,
+    id: row.id,
+    member: toMemberSummary(member),
+    ruleScore: row.ruleScore,
+    status: row.status as MatchStatus,
+  } satisfies MatchCandidateView;
+}
+
+/**
  * 🔵 Intent: `rejected`はF-6-10・types.md §5の注記どおり、候補カード用の一覧からは
  * 除外する（重複疑いリストのような専用の履歴表示だけがrejectedを扱う）。
  * `stale`も同様に除外する（コードレビュー指摘#5）。業務チェック再実施のたびに
@@ -148,28 +177,28 @@ async function buildMatchCandidateViews(
   );
 
   return Promise.all(
-    visible.map(async (row) => {
-      const member = await repositories.members.findOne(
-        whereFieldEquals("members", "id", row.memberId),
-      );
-      if (!member) {
-        throw new Error(`members row not found for id ${row.memberId}`);
-      }
-      const decidedBy = await optionalStaffSummary(
-        repositories,
-        row.decidedById,
-      );
-      return {
-        aiLikelihood: row.aiLikelihood as Likelihood | null,
-        aiReason: row.aiReason,
-        decidedAt: row.decidedAt,
-        decidedBy,
-        id: row.id,
-        member: toMemberSummary(member),
-        ruleScore: row.ruleScore,
-        status: row.status as MatchStatus,
-      } satisfies MatchCandidateView;
-    }),
+    visible.map((row) => buildMatchCandidateView(repositories, row)),
+  );
+}
+
+/** 🔵 Intent: `GET /api/applications/:id/check-runs`（api.md #12・F-3-7）。新しい順で返す。 */
+export async function buildCheckRunHistory(
+  repositories: TenantScopedRepositories,
+  applicationId: ApplicationRow["id"],
+): Promise<CheckRunView[]> {
+  const rows = await repositories.checkRuns.find(
+    whereFieldEquals("check_runs", "applicationId", applicationId),
+  );
+  const sorted = [...rows].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt),
+  );
+  return Promise.all(
+    sorted.map(async (row) =>
+      toCheckRunView(
+        row,
+        await requireStaffSummary(repositories, row.createdById),
+      ),
+    ),
   );
 }
 

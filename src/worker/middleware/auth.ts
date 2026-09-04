@@ -3,6 +3,7 @@ import { getCookie } from "hono/cookie";
 
 import type { TenantRepository } from "../db/repositories";
 import type { OperationTrace } from "../observability/operation-trace";
+import type { ApplicationService } from "../services/application-service";
 import type { AuthService, SessionActor } from "../services/auth";
 import type { BusinessCheckService } from "../services/business-check";
 import type { ImageStorage } from "../services/image-storage";
@@ -22,6 +23,7 @@ export type AppHonoEnv = {
   Bindings: WorkerEnv;
   Variables: {
     actor?: SessionActor;
+    applicationService: ApplicationService;
     auth: AuthService;
     businessCheck: BusinessCheckService;
     config: AppConfig;

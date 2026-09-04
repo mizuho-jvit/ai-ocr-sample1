@@ -65,7 +65,7 @@ timestamp: 2026-08-31T00:00:00Z
 | 10 | PATCH | `/api/applications/:id/fields` | 認証済 | `UpdateFieldsRequest` → `ApplicationDetail` | 200 / 401 / 404 / 422 | F-4-5 |
 | 11 | POST | `/api/applications/:id/status` | 認証済 | `ChangeAppStatusRequest` → `ChangeAppStatusResponse` | 200 / 401 / 404 / 409 | F-4-2〜4 |
 | 12 | GET | `/api/applications/:id/check-runs` | 認証済 | — → `CheckRunView[]` | 200 / 401 / 404 | F-3-7 |
-| 13 | PATCH | `/api/applications/:id/match-candidates/:candidateId` | 認証済 | `DecideMatchRequest` → `DecideMatchResponse` | 200 / 401 / 404 | F-6-8・F-6-9 |
+| 13 | PATCH | `/api/applications/:id/match-candidates/:candidateId` | 認証済 | `DecideMatchRequest` → `DecideMatchResponse` | 200 / 401 / 404 / 409 | F-6-8・F-6-9 |
 | 14 | GET | `/api/images/:applicationId` | 認証済 | — → `{ url, expiresAt }` | 200 / 401 / 404 | NF-2-14・NF-5-19 |
 | 15 | DELETE | `/api/applications/:id/image` | 認証済 | — → 204 | 204 / 401 / 404 | NF-3-2 |
 | 16 | GET | `/api/members/match-candidates` | 認証済 | — → `MatchCandidateView[]` | 200 / 401 | F-5-9 |
@@ -214,6 +214,8 @@ SPA の初期化時に必ず呼び、`401` ならログイン画面へリダイ�
 - `hold` = 保留。重複疑いリスト（#16）に残る
 - 判断結果・判断者・日時を `MatchCandidate` に保存する（F-6-9）
 
+判断可能なのは対象候補が `pending` / `hold` のときだけで、それ以外（`merged` / `rejected` / `stale`）は既に確定済みまたは無効化済みの判断として `409 INVALID_TRANSITION` で拒否する。**申請が `approved`（F-4-2 の確定状態）の場合は `decideMatch` 自体を `409 INVALID_TRANSITION` で拒否し、`Application.memberId` を含め一切変更させない**（`members.status` の `pending` → `active` 昇格・F-4-3 は戻す経路が無い不可逆操作のため）。承認前（受付／審査中／差戻し）に限り、`merged` にする際に同じ申請の別候補が既に `merged` 済みなら「後着優先」（F-4-12）でその候補を `pending`（`decidedById`／`decidedAt` もクリア）へ戻し、`Application.memberId` を今回の候補へ差し替える。申請1件につき `merged` の候補は常に高々1件という不変条件を保つ（詳細は[決定#32](../requirements/decisions.md)）。
+
 > **名寄せはテナント分離の最重点対象である**（NF-5-13）。氏名照合は全会員を走査するため、条件が抜けた場合の照合相手が必ず他テナントのデータになる。クロステナント統合テストの重点対象とする。
 
 ## 会員（F-5）
@@ -294,7 +296,7 @@ Workerはアプリ内セッションとテナントprefixを検証した後、R2
 | `INVALID_CREDENTIALS` | 401 | ログイン失敗。**文言を「メールまたはパスワードが違います」に統一** | F-1-7 |
 | `FORBIDDEN` | 403 | staff が admin 専用APIを呼んだ | NF-2-11・F-7-2 |
 | `NOT_FOUND` | 404 | 存在しない、または**他テナントのレコード** | NF-5-16 |
-| `INVALID_TRANSITION` | 409 | 許可されないステータス遷移 | F-4-2 |
+| `INVALID_TRANSITION` | 409 | 許可されないステータス遷移。名寄せ判断（#13）では、対象候補が`pending`/`hold`以外、または申請が`approved`の場合も含む | F-4-2・[決定#32](../requirements/decisions.md) |
 | `CHECK_RUN_LIMIT` | 409 | 再実施回数が上限 | NF-2-21 |
 | `VALIDATION_ERROR` | 422 | 入力値の不備 | — |
 | `USAGE_LIMIT_EXCEEDED` | 429 | 月次上限（fail closed） | NF-2-16・NF-2-20 |
