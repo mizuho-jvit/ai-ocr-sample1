@@ -6,7 +6,7 @@ import {
   toStaffUserId,
   toTenantId,
 } from "../types";
-import { insertTenantIfAbsent } from "./client";
+import { insertTenantIfAbsent } from "./atomic-writes";
 import {
   createTenantRepository,
   type TableRepository,

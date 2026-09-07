@@ -3,23 +3,35 @@ import { useState } from "react";
 import type { Role, SessionResponse } from "../../worker/types/contracts";
 import { applicationsApi } from "../api/applications";
 import { toErrorMessage } from "../api/auth";
+import { membersApi } from "../api/members";
 import { ocrApi } from "../api/ocr";
 import { ApplicationDetailPage } from "../pages/application-detail-page";
 import { ApplicationListPage } from "../pages/application-list-page";
+import { MemberDetailPage } from "../pages/member-detail-page";
+import { MemberDuplicatesPage } from "../pages/member-duplicates-page";
+import { MemberListPage } from "../pages/member-list-page";
 import { OcrPage } from "../pages/ocr-page";
 import { useAuth } from "./auth-guard";
 
 /**
- * 🟡 Intent: URLベースのルーターは導入せず（決定は未確定事項なし・npm依存を増やさない
- * 既存方針に合わせる）、画面一覧の各画面をここへ切り替え表示するだけの内部状態にする。
- * 「申請詳細」はナビメニューを持たず、一覧からの選択でのみ遷移する。
+ * 🟡 Intent: URLベースのルーターは導入せず（決定#31・npm依存を増やさない既存方針に合わせる）、
+ * 画面一覧の各画面をここへ切り替え表示するだけの内部状態にする。
+ * 「申請詳細」「会員詳細」はナビメニューを持たず、一覧からの選択でのみ遷移する。
  */
-export type Screen = "home" | "applications" | "application-detail";
+export type Screen =
+  | "home"
+  | "applications"
+  | "application-detail"
+  | "members"
+  | "member-detail"
+  | "duplicates";
 
-/** ナビメニューから直接遷移できる画面（他はTask 010の範囲外でまだ無効のまま）。 */
+/** ナビメニューから直接遷移できる画面（スタッフ管理・デモデータ初期化はTask 011の範囲外でまだ無効のまま）。 */
 const NAVIGABLE_SCREENS: ReadonlySet<string> = new Set([
   "home",
   "applications",
+  "members",
+  "duplicates",
 ]);
 
 interface NavItem {
@@ -139,11 +151,15 @@ export function AppShell() {
   const [selectedApplicationId, setSelectedApplicationId] = useState<
     string | null
   >(null);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
   function handleNavigate(nextScreen: Screen) {
     setScreen(nextScreen);
     if (nextScreen !== "application-detail") {
       setSelectedApplicationId(null);
+    }
+    if (nextScreen !== "member-detail") {
+      setSelectedMemberId(null);
     }
   }
 
@@ -155,6 +171,16 @@ export function AppShell() {
   function handleBackToList() {
     setSelectedApplicationId(null);
     setScreen("applications");
+  }
+
+  function handleSelectMember(memberId: string) {
+    setSelectedMemberId(memberId);
+    setScreen("member-detail");
+  }
+
+  function handleBackToMemberList() {
+    setSelectedMemberId(null);
+    setScreen("members");
   }
 
   // 成功時はこのコンポーネントが差し替わるため、送信中フラグは戻さない。
@@ -228,6 +254,20 @@ export function AppShell() {
             onBack={handleBackToList}
           />
         )}
+        {screen === "members" && (
+          <MemberListPage
+            api={membersApi}
+            onSelectMember={handleSelectMember}
+          />
+        )}
+        {screen === "member-detail" && selectedMemberId !== null && (
+          <MemberDetailPage
+            api={membersApi}
+            memberId={selectedMemberId}
+            onBack={handleBackToMemberList}
+          />
+        )}
+        {screen === "duplicates" && <MemberDuplicatesPage api={membersApi} />}
       </main>
       <footer className="app-footer">
         <ul>

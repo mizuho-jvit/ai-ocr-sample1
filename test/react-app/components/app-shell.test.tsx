@@ -190,4 +190,37 @@ describe("AppShell", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  // Task 011: 会員一覧・検索と重複疑いリストは画面が揃ったためナビメニューから遷移できる。
+  it("switches the main screen to the member list and the duplicates list via the nav menu", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        const body = url.includes("/api/members/match-candidates")
+          ? []
+          : { items: [], page: 1, perPage: 20, total: 0 };
+        return new Response(JSON.stringify(body), {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        });
+      }),
+    );
+    try {
+      renderShell(session("staff", false));
+      await screen.findByText(/担当者/);
+
+      fireEvent.click(screen.getByRole("button", { name: "会員一覧・検索" }));
+      expect(
+        await screen.findByRole("heading", { name: "会員一覧・検索" }),
+      ).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "重複疑いリスト" }));
+      expect(
+        await screen.findByRole("heading", { name: "重複疑いリスト" }),
+      ).toBeTruthy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

@@ -23,6 +23,7 @@ import {
   createPublicAuthRoutes,
 } from "./routes/auth";
 import { createCheckRoutes } from "./routes/checks";
+import { createMemberRoutes } from "./routes/members";
 import {
   createApplicationImageRoutes,
   createImageRoutes,
@@ -42,6 +43,10 @@ import {
   createImageStorage,
   type ImageStorage,
 } from "./services/image-storage";
+import {
+  createMemberService,
+  type MemberService,
+} from "./services/member-service";
 import { createOcrPipeline } from "./services/ocr-pipeline";
 import { createUsageService } from "./services/usage";
 import {
@@ -105,6 +110,7 @@ export function createApp(
   providedImageStorage?: ImageStorage,
   providedBusinessCheck?: BusinessCheckService,
   providedApplicationService?: ApplicationService,
+  providedMemberService?: MemberService,
 ): Hono<AppHonoEnv> {
   const app = new Hono<AppHonoEnv>();
 
@@ -148,6 +154,10 @@ export function createApp(
       "applicationService",
       providedApplicationService ??
         createApplicationService({ config, repository }),
+    );
+    context.set(
+      "memberService",
+      providedMemberService ?? createMemberService({ config, repository }),
     );
     try {
       await executeOperation(
@@ -196,6 +206,9 @@ export function createApp(
   // `/:id` と衝突する静的パスは無いため登録順序に依存しない。
   protectedApi.route("/applications", createApplicationRoutes());
   protectedApi.route("/applications", createApplicationImageRoutes());
+  // api.md #16・#19〜23（会員管理・重複疑いリスト）。`/match-candidates`を`/:id`より
+  // 先に登録する順序はcreateMemberRoutes側で担保済み。
+  protectedApi.route("/members", createMemberRoutes());
   // app.route はサブアプリのスナップショットを再生するため、搭載は登録の後に行う。
   app.route("/api", protectedApi);
 

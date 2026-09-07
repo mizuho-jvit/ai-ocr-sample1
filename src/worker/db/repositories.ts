@@ -13,13 +13,13 @@ import type {
 import {
   type CheckRunReservation,
   clearExpiredLoginLock,
-  createScopedDatabase,
+  insertMemberWithNextNumber,
   type LoginFailureState,
   registerLoginFailure,
   reserveCheckRunSlot,
   tenantIds,
-  whereEquals,
-} from "./client";
+} from "./atomic-writes";
+import { createScopedDatabase, whereEquals } from "./client";
 import type {
   applications,
   appStatusHistory,
@@ -93,6 +93,20 @@ export interface ApplicationRepository
   ): Promise<CheckRunReservation | null>;
 }
 
+/**
+ * 🔵 Intent: NF-5-20の連番採番は`insert`（値ベース）では表現できない専用の書き込み経路が要るため、
+ * ApplicationRepository.reserveCheckRunSlotと同じ形で`TableRepository`を拡張する。
+ */
+export interface MemberRepository
+  extends TableRepository<
+    typeof members.$inferSelect,
+    typeof members.$inferInsert
+  > {
+  insertWithNextNumber(
+    values: WithoutTenant<Omit<typeof members.$inferInsert, "memberNumber">>,
+  ): Promise<typeof members.$inferSelect>;
+}
+
 interface RepositoryContext {
   readonly database: D1Database;
   readonly tenantId: TenantId;
@@ -113,10 +127,7 @@ export interface TenantScopedRepositories {
     typeof matchCandidates.$inferSelect,
     typeof matchCandidates.$inferInsert
   >;
-  readonly members: TableRepository<
-    typeof members.$inferSelect,
-    typeof members.$inferInsert
-  >;
+  readonly members: MemberRepository;
   readonly sessions: TableRepository<
     typeof sessions.$inferSelect,
     typeof sessions.$inferInsert
@@ -195,6 +206,30 @@ function applicationRepository(
   });
 }
 
+function memberRepository(
+  scopedDatabase: ScopedDb,
+  context: RepositoryContext,
+): MemberRepository {
+  return Object.freeze({
+    ...tableRepository<
+      typeof members.$inferSelect,
+      typeof members.$inferInsert
+    >(scopedDatabase, "members"),
+    insertWithNextNumber: (
+      values: WithoutTenant<Omit<typeof members.$inferInsert, "memberNumber">>,
+    ) =>
+      insertMemberWithNextNumber(
+        context.database,
+        context.tenantId,
+        values as Omit<
+          typeof members.$inferInsert,
+          "tenantId" | "memberNumber"
+        >,
+        context.trace,
+      ),
+  });
+}
+
 function staffUserRepository(
   scopedDatabase: ScopedDb,
   context: RepositoryContext,
@@ -247,10 +282,7 @@ function scopedRepositories(
       typeof matchCandidates.$inferSelect,
       typeof matchCandidates.$inferInsert
     >(scopedDatabase, "match_candidates"),
-    members: tableRepository<
-      typeof members.$inferSelect,
-      typeof members.$inferInsert
-    >(scopedDatabase, "members"),
+    members: memberRepository(scopedDatabase, context),
     sessions: tableRepository<
       typeof sessions.$inferSelect,
       typeof sessions.$inferInsert

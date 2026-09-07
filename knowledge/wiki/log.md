@@ -2,6 +2,29 @@
 
 <!-- 予約ファイル。フロントマターは付けない。日付見出し（ISO 8601）ごとに新しいものを上に追記する。 -->
 
+## 2026-09-07
+
+### Task 011（会員管理）へのcodexレビュー指摘とユーザー指摘への対応
+
+- **コードレビュー(`output/task-011-code-review.md`)のP2指摘6件を修正した。** ①`GET /api/members`の電話番号フィルタが不正な値（数字を含まない文字列）で全件ヒットしていた欠陥を、生年月日フィルタと同じ「実在し得ない値へフォールバックする」方式（`IMPOSSIBLE_PHONE_FILTER`）で修正。②`member-service.ts`の`IMPOSSIBLE_BIRTH_DATE_FILTER`定数値にリテラルのNUL文字が誤って混入しており、`git diff`がこのファイルをbinary扱いしてしまう問題を解消。③会員詳細画面で住所・メール等の任意項目を空欄にして保存しても、フロントが空文字を`undefined`に変換して送るため既存値が消せなかった欠陥を、フォームの値をそのまま送り`emptyToNull`ヘルパーでサーバ側がnullへ変換する方式に修正（決定は伴わない実装バグ修正）。④氏名が半角/全角空白のみでも登録できていたのを`name.trim().length === 0`で弾くよう修正。⑤会員詳細画面の原本画像プレビューが署名付きURL（15分で失効）を一度キャッシュすると再表示ボタンを押しても再取得しなかった欠陥を、クリックのたびに再取得する方式に修正。⑥会員一覧・検索の検索条件変更時、古い検索の応答が新しい検索より遅れて返ると結果を上書きする競合状態を、リクエスト世代番号（`latestRequestIdRef`）で最新以外の応答を無視する方式で修正。
+- **会員一覧・検索画面のスタイル・ボタンサイズを会員詳細画面に統一した。** `theme.css`に`page-heading`・`section-stack`・`card-section`・`card-section-title`・`field-grid`・`filter-bar`/`filter-field`・`data-table`・`pagination-bar`/`page-indicator`を新設し、両画面のインラインstyleの重複をCSSクラスへ集約した。検索条件欄も`field-label`/`field-input`の見た目に統一し、主要ボタンは`btn-small`ではなく`btn btn-primary`（会員詳細の「保存する」「変更する」と同じ高さ）とした。
+- **氏名カナへのひらがな混入（ユーザー指摘）に対応し、全角カタカナ（長音・中点含む）と空白以外を422で弾くようにした。** F-6-1のひらがな→カタカナ変換は検索キー（`kanaNormalized`）生成用の正規化であり、会員登録データそのものの表記は制約していなかったため、`routes/members.ts`に新規のバリデーションとして追加した（名寄せ側の正規化ロジックは変更なし）。
+- **決定#42: 会員登録・編集の各項目に最大文字数・文字種の制約を追加した。** 氏名30字／氏名カナ90字・全角カタカナのみ／生年月日10字・半角数字と`-`/`/`のみ／電話番号20字・半角数字と`-`のみ／郵便番号10字・半角数字と`-`のみ／住所100字／メール50字・半角英数記号のみ（ユーザー指定）。生年月日の和暦入力・電話番号の全角入力（いずれも`member-normalizer.ts`がOCR/名寄せ経由で対応済み）と衝突することが判明したため、会員情報登録画面はOCRを経由しない手入力専用画面であるとの位置付けから、ユーザーの指示どおり生の入力文字列に制約をそのまま適用する（本画面では和暦・全角入力は不可）。`member-normalizer.ts`自体は変更していないため、OCR抽出→名寄せの経路は引き続き和暦・全角入力に対応する。
+- 全項目、`POST`/`PATCH`の両エンドポイントにテストを追加し（境界値の受理・超過/文字種違反の拒否）、修正の妥当性は実装を一時的に元へ戻して当該テストが実際に失敗することでも確認した。`corepack pnpm test`（51ファイル・504テスト）/ `lint` / `tsc -b` / `build` で確認した。
+
+## 2026-09-05
+
+### 会員管理と状態履歴を実装した（Task 011）
+
+- **`GET /api/members/match-candidates`（重複疑いリスト・api.md #16）・`GET /api/members`（一覧・検索・#19）・`POST /api/members`（登録・#20）・`GET .../:id`（詳細・#21）・`PATCH .../:id`（編集・#22）・`POST .../:id/status`（状態変更・#23）をすべて実装した。** ルート（`src/worker/routes/members.ts`）は検証とセッション解決のみを行い、業務ロジックは新設の`MemberService`（`src/worker/services/member-service.ts`）へ委ねた（`application-service.ts`と同じ責務分離）。`MemberDetail`の組み立ては`src/worker/services/member-view.ts`に集約し、申請履歴（F-5-6・`hasImage`付き）と状態遷移履歴を1回の呼び出しで返す。
+- **会員番号（`memberNumber`）の`MAX + 1`連番採番（NF-5-20）を、読み取ってから書く実装では並行登録で衝突するため、`INSERT ... VALUES`のカラム値にサブクエリを埋め込む単一SQL文（`insertMemberWithNextNumber`）で実現した。** `reserveCheckRunSlot`・`incrementUsageCounter`と同じ「事前SELECTを避ける」規律に従う。3件を並行作成して番号が重複しないことを確認するテストを書いたうえで、実装を一時的に「読み取ってから書く」ナイーブ版に戻すミューテーションテストを行い、意図どおり`UNIQUE(tenantId, memberNumber)`違反で失敗することを確認してから元に戻した。
+- **`src/worker/db/client.ts`が既に559行と500行ルールを超えていたため（本タスクの変更で602行になり顕在化）、事前SELECTを避ける単一文の書き込みヘルパー群（ログイン失敗ロック・CheckRun上限・会員番号連番・月次利用量上限・Tenant起動検証）を`src/worker/db/atomic-writes.ts`へ切り出した。** `client.ts`には汎用`ScopedDb`実装（`createScopedDatabase`）と`SqlExpr`ビルダーのみが残る。呼び出し元（`repositories.ts`・`seed.ts`・`services/usage.ts`）のimportを更新した。
+- **`CreateMemberRequest.phone`が`phone?: string`（任意）と定義されていたが、`members`テーブルは`phone`を`NOT NULL`かつ数字のみ・空文字禁止で強制しており、型とスキーマが矛盾していたため`phone: string`（必須）へ修正した（決定#39）。** ほかに、会員状態変更に許可遷移表を設けない（決定#40。`AppStatus`と異なりF-5に遷移表の定めがない）、`GET /api/members`の検索実装（決定#41。`q`はF-6-1の正規化を検索キー側にも適用した部分一致=F-5-5、`birthDate`/`phone`は正規化後の完全一致）の3件を実装時判断としてwikiへ正典化した。
+- **SPA側は`src/react-app/{api/members.ts,pages/member-list-page.tsx,pages/member-detail-page.tsx,pages/member-duplicates-page.tsx}`を新規実装した。** `screen-list.md`は独立した「会員登録」画面を持たないため、新規登録は会員一覧画面内のトグル式フォームで行う（名寄せ判断が申請詳細に統合されているのと同じ考え方）。`AppShell`のナビメニューから「会員一覧・検索」「重複疑いリスト」を有効化した（スタッフ管理・デモデータ初期化はTask 011の範囲外で引き続き無効のまま）。
+- **重複疑いリスト（F-5-9）は判断操作を持たない読み取り専用の一覧とした。** `GET /api/members/match-candidates`は特定の申請に属さない会員側の横断ビューであり（決定#3）、`MatchCandidateView`自体が`applicationId`を持たないため、判断（F-6-8）は引き続き申請詳細画面の候補カードのみで行う。
+- ローカル`wrangler dev`相当の環境（`corepack pnpm dev`＝Cloudflare Vite pluginのMiniflare）でブラウザ実機確認を行い、表記ゆれ検索（「仙台」で「仙臺 一郎」がヒット）・新規登録（連番採番・和暦生年月日の西暦変換・電話番号のハイフン除去）・編集・状態変更（履歴への変更者・日時・理由の記録）・重複疑いリスト表示が実際に動作することを確認した。
+- Worker側は`test/worker/{routes/members-{query,mutation},services/member-service-{read,write}}.test.ts`（500行ルールにより分割）を追加した。SPA側は`test/react-app/{api/members,pages/member-{list,detail,duplicates}-page}.test.tsx`を追加し、`app-shell.test.tsx`にナビ切り替えのテストを1件足した。`corepack pnpm test`（51ファイル・462テスト）/ `lint` / `tsc -b` / `build` で確認した。
+
 ## 2026-09-04
 
 ### 名寄せ候補カードがOCRラベルの表記ゆれを拾えない欠陥を修正した（Task 023・決定#38・コードレビュー指摘#6）

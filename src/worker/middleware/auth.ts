@@ -7,6 +7,7 @@ import type { ApplicationService } from "../services/application-service";
 import type { AuthService, SessionActor } from "../services/auth";
 import type { BusinessCheckService } from "../services/business-check";
 import type { ImageStorage } from "../services/image-storage";
+import type { MemberService } from "../services/member-service";
 import type { UsageService } from "../services/usage";
 import {
   ApiErrorException,
@@ -28,6 +29,7 @@ export type AppHonoEnv = {
     businessCheck: BusinessCheckService;
     config: AppConfig;
     imageStorage: ImageStorage;
+    memberService: MemberService;
     ocrPipeline: OcrPipeline;
     repository: TenantRepository;
     trace: OperationTrace;

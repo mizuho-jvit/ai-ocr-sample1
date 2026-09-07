@@ -233,3 +233,82 @@ body {
   padding-left: 20px;
   margin: 0;
 }
+
+/*
+ * 会員一覧・検索/会員詳細で共通のページ構造(見出し・カード区画・フィールド配置・表・ページング)。
+ * ページごとにインラインstyleを重複させず、この単位で統一する。
+ */
+.page-heading {
+  margin: 0 0 14px;
+  font-size: 19px;
+  letter-spacing: 0.1em;
+}
+
+.section-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card-section {
+  padding: 12px;
+}
+
+.card-section-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.field-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-bottom: 10px;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.filter-field {
+  flex: 1 1 160px;
+  max-width: 220px;
+}
+
+.data-table {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+.data-table th,
+.data-table td {
+  padding: 8px 12px;
+  text-align: left;
+}
+.data-table thead tr {
+  font-size: 12px;
+}
+.data-table tbody tr + tr {
+  border-top: 1px solid var(--rule);
+}
+
+.table-empty-message {
+  padding: 16px 12px;
+  color: var(--ink-soft);
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.page-indicator {
+  font-size: 12px;
+  color: var(--ink-soft);
+}

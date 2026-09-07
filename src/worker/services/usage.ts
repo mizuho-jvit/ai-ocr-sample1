@@ -2,7 +2,7 @@ import {
   incrementUsageCounter,
   readUsageCounter,
   type UsageCounterRow,
-} from "../db/client";
+} from "../db/atomic-writes";
 import type { OperationTrace } from "../observability/operation-trace";
 import {
   ApiErrorException,

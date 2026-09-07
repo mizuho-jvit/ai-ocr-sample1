@@ -379,13 +379,16 @@ export interface MemberListResponse {
   perPage: number;
 }
 
+/** 🟡 Intent: `phone`はDB側がNOT NULL・数字のみ・空文字禁止(members_phone_digits_check)を強制するため、
+ * ここでも必須にする(決定#39)。要件定義v1.11の項目一覧はメールのみを任意としており、他の任意可否は
+ * データモデル(NULL可否)に従うが、`phone`だけはNULL不可のため必須とする。 */
 export interface CreateMemberRequest {
   name: string;
   nameKana?: string;
   birthDate?: string;
   postalCode?: string;
   address?: string;
-  phone?: string;
+  phone: string;
   email?: string;
   status: MemberStatus;
 }
