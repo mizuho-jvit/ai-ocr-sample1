@@ -1,16 +1,19 @@
 import { useState } from "react";
 
-import type { Role, SessionResponse } from "../../worker/types/contracts";
+import type { SessionResponse } from "../../worker/types/contracts";
 import { applicationsApi } from "../api/applications";
 import { toErrorMessage } from "../api/auth";
 import { membersApi } from "../api/members";
 import { ocrApi } from "../api/ocr";
+import { staffApi } from "../api/staff";
+import { ROLE_LABELS } from "../labels";
 import { ApplicationDetailPage } from "../pages/application-detail-page";
 import { ApplicationListPage } from "../pages/application-list-page";
 import { MemberDetailPage } from "../pages/member-detail-page";
 import { MemberDuplicatesPage } from "../pages/member-duplicates-page";
 import { MemberListPage } from "../pages/member-list-page";
 import { OcrPage } from "../pages/ocr-page";
+import { StaffPage } from "../pages/staff-page";
 import { useAuth } from "./auth-guard";
 
 /**
@@ -24,14 +27,16 @@ export type Screen =
   | "application-detail"
   | "members"
   | "member-detail"
-  | "duplicates";
+  | "duplicates"
+  | "staff";
 
-/** ナビメニューから直接遷移できる画面（スタッフ管理・デモデータ初期化はTask 011の範囲外でまだ無効のまま）。 */
+/** ナビメニューから直接遷移できる画面（デモデータ初期化はTask 014で画面が揃うまで無効のまま）。 */
 const NAVIGABLE_SCREENS: ReadonlySet<string> = new Set([
   "home",
   "applications",
   "members",
   "duplicates",
+  "staff",
 ]);
 
 interface NavItem {
@@ -88,11 +93,6 @@ export const MANDATORY_NOTICES: readonly string[] = [
 ];
 
 export const LOGOUT_FAILED_MESSAGE = "ログアウトできませんでした。";
-
-const ROLE_LABELS: Record<Role, string> = {
-  admin: "管理者",
-  staff: "担当者",
-};
 
 export interface AppNavProps {
   // `role` を単独のpropにするとJSX上のARIA属性と衝突するため、セッションごと渡す。
@@ -268,6 +268,7 @@ export function AppShell() {
           />
         )}
         {screen === "duplicates" && <MemberDuplicatesPage api={membersApi} />}
+        {screen === "staff" && <StaffPage api={staffApi} />}
       </main>
       <footer className="app-footer">
         <ul>

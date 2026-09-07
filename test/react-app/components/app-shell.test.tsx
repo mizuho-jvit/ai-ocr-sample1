@@ -223,4 +223,29 @@ describe("AppShell", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  // Task 012: スタッフ管理は画面が揃ったため、admin のナビメニューから遷移できる。
+  it("switches the main screen to staff management via the nav menu for admin", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify([]), {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        }),
+      ),
+    );
+    try {
+      renderShell(session("admin", true));
+      await screen.findByText(/管理者/);
+
+      fireEvent.click(screen.getByRole("button", { name: "スタッフ管理" }));
+
+      expect(
+        await screen.findByRole("heading", { name: "スタッフ管理" }),
+      ).toBeTruthy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

@@ -3,6 +3,7 @@ import type {
   Likelihood,
   MatchStatus,
   MemberStatus,
+  Role,
   Triage,
 } from "../worker/types/contracts";
 
@@ -45,4 +46,9 @@ export const MEMBER_STATUS_LABELS: Record<MemberStatus, string> = {
   inactive: "退会",
   pending: "申請中",
   suspended: "停止中",
+};
+
+export const ROLE_LABELS: Record<Role, string> = {
+  admin: "管理者",
+  staff: "担当者",
 };

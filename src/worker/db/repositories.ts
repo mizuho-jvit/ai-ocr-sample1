@@ -18,6 +18,8 @@ import {
   registerLoginFailure,
   reserveCheckRunSlot,
   tenantIds,
+  type UpdateStaffUserGuardOptions,
+  updateStaffUserGuarded,
 } from "./atomic-writes";
 import { createScopedDatabase, whereEquals } from "./client";
 import type {
@@ -75,6 +77,17 @@ export interface StaffUserRepository
     staffUserId: StaffUserId,
     input: { lockThreshold: number; lockedUntil: string },
   ): Promise<LoginFailureState | null>;
+  /**
+   * コードレビュー指摘(P1・2件)。呼び出し側は、この更新で対象行が有効なadminで
+   * なくなる場合は`requireOtherActiveAdmin: true`を渡す(他に有効なadminが存在しない
+   * なら更新自体を行わず`null`を返す)。`isActive: false`へ更新する(無効化する)場合は
+   * `deleteSessions: true`を渡し、対象職員の既存セッションを同一トランザクションで削除する。
+   */
+  updateGuarded(
+    staffUserId: StaffUserId,
+    values: Partial<WithoutTenant<typeof staffUsers.$inferSelect>>,
+    options: UpdateStaffUserGuardOptions,
+  ): Promise<typeof staffUsers.$inferSelect | null>;
 }
 
 /**
@@ -259,6 +272,19 @@ function staffUserRepository(
         context.tenantId,
         staffUserId,
         input,
+        context.trace,
+      ),
+    updateGuarded: (
+      staffUserId: StaffUserId,
+      values: Partial<WithoutTenant<typeof staffUsers.$inferSelect>>,
+      options: UpdateStaffUserGuardOptions,
+    ) =>
+      updateStaffUserGuarded(
+        context.database,
+        context.tenantId,
+        staffUserId,
+        values,
+        options,
         context.trace,
       ),
   });

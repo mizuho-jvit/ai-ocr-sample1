@@ -78,7 +78,7 @@ timestamp: 2026-08-31T00:00:00Z
 | 23 | POST | `/api/members/:id/status` | 認証済 | `ChangeMemberStatusRequest` → `MemberDetail` | 200 / 401 / 404 / 422 | F-5-7 |
 | 24 | GET | `/api/staff` | **admin** | — → `StaffUserSummary[]` | 200 / 401 / 403 | F-7-1・F-7-2 |
 | 25 | POST | `/api/staff` | **admin** | `CreateStaffRequest` → `StaffUserSummary` | 201 / 401 / 403 / 422 | F-7-1 |
-| 26 | PATCH | `/api/staff/:id` | **admin** | `UpdateStaffRequest` → `StaffUserSummary` | 200 / 401 / 403 / 404 | F-7-1 |
+| 26 | PATCH | `/api/staff/:id` | **admin** | `UpdateStaffRequest` → `StaffUserSummary` | 200 / 401 / 403 / 404 / **409** | F-7-1・[決定#44](../requirements/decisions.md) |
 | 27 | GET | `/api/demo/reset/preview` | **admin** | — → `ResetPreviewResponse` | 200 / 401 / 403 / **404** | F-9-6〜8 |
 | 28 | POST | `/api/demo/reset` | **admin** | `ResetRequest` → `ResetResponse` | 200 / 401 / 403 / **404** / 422 | F-9-6〜9 |
 
@@ -251,6 +251,12 @@ SPA の初期化時に必ず呼び、`401` ならログイン画面へリダイ�
 
 **staff ロールが呼び出した場合は `403`**（F-7-2・NF-2-11）。画面側の制御だけに依存しない。無効化は `isActive: false` で行い、削除エンドポイントを設けない。
 
+**テナント内に有効な admin が1人以上存在する不変条件を維持する。** `PATCH /api/staff/:id`（#26）が、最後の有効な admin を無効化（`isActive: false`）またはstaffへ降格（`role: "staff"`）しようとした場合は `409 INVALID_TRANSITION` で拒否する。他に有効な admin がいる場合は制限なく変更できる（詳細は[決定#44](../requirements/decisions.md)）。
+
+**無効化（`isActive: false`）は、対象職員の既存セッションを同一トランザクションで削除する。** セッション行を残すと、無効化中は`resolveSession()`が`isActive`を見て拒否するものの、後日その職員を再有効化した際に有効期限内の古いCookieで再び認証できてしまう。無効化以外の更新（氏名変更・役割変更のみ等）や再有効化（`isActive: true`）ではセッションを削除しない（詳細は[決定#45](../requirements/decisions.md)）。
+
+**`CreateStaffRequest.email` / `password`はサーバー側でも形式・長さを検証する。** `email`は`ローカル部@ドメイン部.TLD`の簡易パターン(空白を含まない。前後・埋め込みの空白は自動的に拒否し、トリム等の正規化は行わない)にのみ一致するかを検証し、最大254文字とする。`password`は最小12文字・最大50文字とする(複雑さ(大文字・記号混在等)の強制は行わない)。`email`は`UpdateStaffRequest`の対象外(更新不可)のため`PATCH`では検証しない。`password`(任意項目)は`PATCH`でも指定時のみ同じ長さ検証を適用する。いずれも要件に基準が無い実装時判断のため詳細は[決定#47](../requirements/decisions.md)を参照する。
+
 ## 原本画像
 
 ### `GET /api/images/:applicationId`
@@ -296,7 +302,7 @@ Workerはアプリ内セッションとテナントprefixを検証した後、R2
 | `INVALID_CREDENTIALS` | 401 | ログイン失敗。**文言を「メールまたはパスワードが違います」に統一** | F-1-7 |
 | `FORBIDDEN` | 403 | staff が admin 専用APIを呼んだ | NF-2-11・F-7-2 |
 | `NOT_FOUND` | 404 | 存在しない、または**他テナントのレコード** | NF-5-16 |
-| `INVALID_TRANSITION` | 409 | 許可されないステータス遷移。名寄せ判断（#13）では、対象候補が`pending`/`hold`以外、または申請が`approved`の場合も含む | F-4-2・[決定#32](../requirements/decisions.md) |
+| `INVALID_TRANSITION` | 409 | 許可されないステータス遷移。名寄せ判断（#13）では、対象候補が`pending`/`hold`以外、または申請が`approved`の場合も含む。スタッフ編集（#26）では、最後の有効なadminを無効化・staffへ降格しようとした場合も含む | F-4-2・[決定#32](../requirements/decisions.md)・F-7-1・[決定#44](../requirements/decisions.md) |
 | `CHECK_RUN_LIMIT` | 409 | 再実施回数が上限 | NF-2-21 |
 | `VALIDATION_ERROR` | 422 | 入力値の不備 | — |
 | `USAGE_LIMIT_EXCEEDED` | 429 | 月次上限（fail closed） | NF-2-16・NF-2-20 |
@@ -325,7 +331,7 @@ Workerはアプリ内セッションとテナントprefixを検証した後、R2
 | 7 | ログインのロック中も通常の失敗と同一応答にする | F-1-7 の目的（アカウント存在の秘匿）は、ロックを区別可能にすると失われる。`Retry-After` も返さない |
 | 8 | 申請の新規作成エンドポイントを設けない | F-2-8 により申請は読取完了時のみ生成される。作成の口を別に設けると経路が二重化する |
 | 9 | セッションの有効期間を **12時間**とする | 要件は期間を定めていない。商談1日分を賄い、かつ放置端末が翌日まで開いたままにならない長さ。失効の判断は `Session.expiresAt` をサーバー側で見る（Cookie に `Expires` を付けない） |
-| 10 | 無効化された職員（`isActive = false`）の既存セッションを失効させる | F-7-1 の無効化が次回ログインまで効かないと、無効化の意味が失われる。`GET /api/auth/session` を含む全ての保護対象APIが `401` になる |
+| 10 | 無効化された職員（`isActive = false`）の既存セッションを失効させる。無効化と同時に対象の`sessions`行を削除し、`resolveSession()`の`isActive`検査だけに頼らない | F-7-1 の無効化が次回ログインまで効かないと、無効化の意味が失われる。`GET /api/auth/session` を含む全ての保護対象APIが `401` になる。行を削除せず検査だけに頼ると、後日その職員を再有効化した際に有効期限内の古いCookieが復活してしまう欠陥（コードレビュー指摘・P1・[決定#45](../requirements/decisions.md)）があったため、削除まで行うと明記した |
 | 11 | ログインは成否によらず **常に1回だけ**鍵導出を行う | アカウントが存在しない場合に PBKDF2 を丸ごと省くと、応答時間の桁違いの差からアカウントの存在が判別でき F-1-7 の秘匿が破れる。存在しない場合もダミーのソルトで同じ計算を行う。**ただし時間差の隠蔽は best-effort である**（下記の注記を参照） |
 
 > **F-1-7 の秘匿について、応答時間で保証できる範囲**（判断 #11 の限界）

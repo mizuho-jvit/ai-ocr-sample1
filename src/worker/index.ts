@@ -29,6 +29,7 @@ import {
   createImageRoutes,
   createOcrRoutes,
 } from "./routes/ocr";
+import { createStaffRoutes } from "./routes/staff";
 import { createUsageRoutes } from "./routes/usage";
 import {
   type ApplicationService,
@@ -48,6 +49,10 @@ import {
   type MemberService,
 } from "./services/member-service";
 import { createOcrPipeline } from "./services/ocr-pipeline";
+import {
+  createStaffService,
+  type StaffService,
+} from "./services/staff-service";
 import { createUsageService } from "./services/usage";
 import {
   type AppConfig,
@@ -111,6 +116,7 @@ export function createApp(
   providedBusinessCheck?: BusinessCheckService,
   providedApplicationService?: ApplicationService,
   providedMemberService?: MemberService,
+  providedStaffService?: StaffService,
 ): Hono<AppHonoEnv> {
   const app = new Hono<AppHonoEnv>();
 
@@ -158,6 +164,10 @@ export function createApp(
     context.set(
       "memberService",
       providedMemberService ?? createMemberService({ config, repository }),
+    );
+    context.set(
+      "staffService",
+      providedStaffService ?? createStaffService({ config, repository }),
     );
     try {
       await executeOperation(
@@ -209,6 +219,8 @@ export function createApp(
   // api.md #16・#19〜23（会員管理・重複疑いリスト）。`/match-candidates`を`/:id`より
   // 先に登録する順序はcreateMemberRoutes側で担保済み。
   protectedApi.route("/members", createMemberRoutes());
+  // api.md #24〜26（スタッフ管理）。adminのみ(F-7-2)はcreateStaffRoutes内のadminGuardで検証する。
+  protectedApi.route("/staff", createStaffRoutes());
   // app.route はサブアプリのスナップショットを再生するため、搭載は登録の後に行う。
   app.route("/api", protectedApi);
 

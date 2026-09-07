@@ -8,6 +8,7 @@ import type { ApplicationId, PeriodKey, StaffUserId, TenantId } from "../types";
 import {
   applications,
   members,
+  sessions,
   staffUsers,
   tenants,
   usageCounter,
@@ -92,6 +93,92 @@ export async function registerLoginFailure(
         lockedUntil: staffUsers.lockedUntil,
       });
     return rows[0] ?? null;
+  });
+}
+
+export interface UpdateStaffUserGuardOptions {
+  /**
+   * コードレビュー指摘(P1)。この更新で対象行が「有効なadmin」でなくなる場合に
+   * 限りtrueにする。他に有効なadminが存在しない限り、更新を(0行影響として)拒否する。
+   */
+  readonly requireOtherActiveAdmin: boolean;
+  /**
+   * コードレビュー指摘(P1・関連)。`isActive: false`へ更新する(無効化する)場合に
+   * 限りtrueにする。対象職員の既存セッションを、この更新と同一のD1トランザクションで
+   * 削除する。再有効化後に古いセッション(Cookie)が復活する経路を断つ。
+   */
+  readonly deleteSessions: boolean;
+}
+
+/**
+ * 🔵 Intent: コードレビュー指摘(P1・2件)。
+ * (1) 最後の有効なadminを無効化・staffへ降格すると、`/api/staff`へアクセスできる
+ * 利用者が0人になり、アプリ内に復旧手段が無くなる（F-7-1）。「他に有効なadminがいるか
+ * 読み取ってから判定する」実装では、異なる2人の管理者がほぼ同時にそれぞれ自分を降格
+ * すると両方が「他にadminがいる」と判定してしまうため、EXISTSサブクエリをUPDATEの
+ * WHEREへ埋め込み、更新確定と同じSQL文で検証する
+ * （reserveCheckRunSlot・incrementUsageCounterと同じ「条件付きUPDATE」の規律）。
+ * (2) 無効化時に`staff_users.isActive`だけを更新すると、対象職員の`sessions`行が
+ * 12時間の有効期限まで残り、再有効化すると古いCookieで再びアクセスできてしまう。
+ * `isActive: false`への更新とセッション全削除を`client.batch`(D1の単一トランザクション)
+ * へ同時に渡し、どちらも同じEXISTS条件で成否を揃える(条件を満たさない=更新を拒否する
+ * ときはセッションも削除しない。対象行自身の有効なadmin判定に他行の状態は影響しないため、
+ * `requireOtherActiveAdmin: false`のとき条件は常に真として扱う)。
+ */
+export async function updateStaffUserGuarded(
+  database: D1Database,
+  tenantId: TenantId,
+  staffUserId: StaffUserId,
+  values: Partial<Omit<typeof staffUsers.$inferSelect, "tenantId">>,
+  options: UpdateStaffUserGuardOptions,
+  trace?: OperationTrace,
+): Promise<typeof staffUsers.$inferSelect | null> {
+  return executeOperation(trace, STAFF_UPDATE_OPERATION, async () => {
+    const client = drizzle(database);
+    const guardConditions = options.requireOtherActiveAdmin
+      ? [
+          sql`EXISTS (
+            SELECT 1 FROM ${staffUsers}
+            WHERE ${staffUsers.tenantId} = ${tenantId}
+              AND ${staffUsers.id} != ${staffUserId}
+              AND ${staffUsers.role} = 'admin'
+              AND ${staffUsers.isActive} = 1
+          )`,
+        ]
+      : [];
+
+    const updateQuery = client
+      .update(staffUsers)
+      .set(values)
+      .where(
+        and(
+          eq(staffUsers.tenantId, tenantId),
+          eq(staffUsers.id, staffUserId),
+          ...guardConditions,
+        ),
+      )
+      .returning();
+
+    if (!options.deleteSessions) {
+      const rows = await updateQuery;
+      return rows[0] ?? null;
+    }
+
+    const deleteSessionsQuery = client
+      .delete(sessions)
+      .where(
+        and(
+          eq(sessions.tenantId, tenantId),
+          eq(sessions.staffUserId, staffUserId),
+          ...guardConditions,
+        ),
+      );
+
+    const [updatedRows] = await client.batch([
+      updateQuery,
+      deleteSessionsQuery,
+    ]);
+    return (updatedRows as (typeof staffUsers.$inferSelect)[])[0] ?? null;
   });
 }
 
