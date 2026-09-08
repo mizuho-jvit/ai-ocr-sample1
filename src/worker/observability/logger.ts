@@ -1,4 +1,4 @@
-import type { ErrorCode } from "../types";
+import type { ErrorCode, StaffUserId } from "../types";
 import type { OperationTrace } from "./operation-trace";
 
 export interface LogSink {
@@ -83,5 +83,64 @@ export function emitRequestLog(
     // LOG-11: 可観測性障害で本来の業務処理やエラー応答を変更しない。
   } finally {
     trace.customLogEmitted = true;
+  }
+}
+
+export interface DemoResetLogEvent {
+  readonly schemaVersion: 1;
+  readonly event: "demo_reset.completed" | "demo_reset.failed";
+  readonly level: "info" | "error";
+  readonly occurredAt: string;
+  readonly executedById: StaffUserId;
+  readonly deletedApplications: number;
+  readonly deletedImages: number;
+  readonly deletedMembers: number;
+}
+
+export interface DemoResetLogInput {
+  readonly executedById: StaffUserId;
+  readonly deletedApplications: number;
+  readonly deletedImages: number;
+  readonly deletedMembers: number;
+  /**
+   * 🟡 Intent: コードレビュー指摘・P2・決定#52。"success"はD1・R2とも完了した通常経路。
+   * "partial_failure"はD1（②）は確定したがR2（③）の削除が途中で失敗した経路で、
+   * `deletedImages`にはR2側でそこまでに確定した件数を渡す。いずれもF-9-10の対象。
+   */
+  readonly outcome: "success" | "partial_failure";
+}
+
+/**
+ * 🟡 Intent: F-9-10。実行の事実（実行者・日時・削除件数）だけを1件出力する例外ログ。
+ * LOG-5「正常リクエストはInvocation Logのみ」が前提とする監査手段
+ * （`createdById`/`updatedById`等の更新記録列）は、削除対象の行そのものが消える
+ * デモリセットでは機能しないため、F-9はこの一般則の対象外として明示的にログを出す
+ * （削除対象のテーブルには記録しない・F-9-10）。**R2削除が途中で失敗しD1だけ確定した
+ * 場合も`outcome: "partial_failure"`で必ず記録し、「D1を削除した事実」を失わない**
+ * （コードレビュー指摘・P2・決定#52）。個人情報・帳票・SQL値は含めない(LOG-8)。
+ */
+export function emitDemoResetLog(
+  input: DemoResetLogInput,
+  sink: LogSink = console,
+): void {
+  const level = input.outcome === "success" ? "info" : "error";
+  const event: DemoResetLogEvent = Object.freeze({
+    deletedApplications: input.deletedApplications,
+    deletedImages: input.deletedImages,
+    deletedMembers: input.deletedMembers,
+    event:
+      input.outcome === "success"
+        ? "demo_reset.completed"
+        : "demo_reset.failed",
+    executedById: input.executedById,
+    level,
+    occurredAt: new Date().toISOString(),
+    schemaVersion: 1,
+  });
+
+  try {
+    sink[level](event);
+  } catch {
+    // LOG-11: 可観測性障害で本来の業務処理を変更しない。
   }
 }

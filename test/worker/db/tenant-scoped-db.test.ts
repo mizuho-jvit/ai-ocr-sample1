@@ -32,6 +32,7 @@ function createExecutor(): TenantScopedExecutor {
     prepareUpdate: vi.fn(
       (_table, values) => values as unknown as ScopedWriteOp,
     ),
+    prepareDelete: vi.fn((_table, where) => where as unknown as ScopedWriteOp),
     select: vi.fn(async () => []),
     selectOne: vi.fn(async () => null),
     update: vi.fn(async () => 1),
@@ -123,6 +124,19 @@ describe("tenant-scoped database boundary", () => {
       id?: string;
       name?: string;
     }>();
+  });
+
+  it("adds the tenant predicate to prepareDelete (決定#49)", () => {
+    const executor = createExecutor();
+    const db = forTenant(TENANT_A, executor);
+
+    db.prepareDelete("members", CALLER_WHERE);
+
+    expect(executor.prepareDelete).toHaveBeenCalledWith("members", {
+      additional: CALLER_WHERE,
+      operator: "and",
+      tenant: { column: "tenantId", operator: "eq", value: TENANT_A },
+    });
   });
 
   it("rejects an empty tenant scope", () => {

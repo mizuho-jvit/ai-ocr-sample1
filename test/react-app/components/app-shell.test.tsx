@@ -248,4 +248,37 @@ describe("AppShell", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  // Task 014: デモデータ初期化は画面が揃ったため、admin のナビメニューから遷移できる。
+  it("switches the main screen to demo data reset via the nav menu for admin", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            applications: 0,
+            confirmationWord: "RESET",
+            images: 0,
+            members: 0,
+          }),
+          {
+            headers: { "Content-Type": "application/json" },
+            status: 200,
+          },
+        ),
+      ),
+    );
+    try {
+      renderShell(session("admin", true));
+      await screen.findByText(/管理者/);
+
+      fireEvent.click(screen.getByRole("button", { name: "デモデータ初期化" }));
+
+      expect(
+        await screen.findByRole("heading", { name: "デモデータ初期化" }),
+      ).toBeTruthy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

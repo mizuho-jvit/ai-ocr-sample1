@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { SessionResponse } from "../../worker/types/contracts";
 import { applicationsApi } from "../api/applications";
 import { toErrorMessage } from "../api/auth";
+import { demoResetApi } from "../api/demo-reset";
 import { membersApi } from "../api/members";
 import { ocrApi } from "../api/ocr";
 import { staffApi } from "../api/staff";
@@ -13,6 +14,7 @@ import { MemberDetailPage } from "../pages/member-detail-page";
 import { MemberDuplicatesPage } from "../pages/member-duplicates-page";
 import { MemberListPage } from "../pages/member-list-page";
 import { OcrPage } from "../pages/ocr-page";
+import { ResetPage } from "../pages/reset-page";
 import { StaffPage } from "../pages/staff-page";
 import { useAuth } from "./auth-guard";
 
@@ -28,15 +30,17 @@ export type Screen =
   | "members"
   | "member-detail"
   | "duplicates"
-  | "staff";
+  | "staff"
+  | "data-reset";
 
-/** ナビメニューから直接遷移できる画面（デモデータ初期化はTask 014で画面が揃うまで無効のまま）。 */
+/** ナビメニューから直接遷移できる画面。 */
 const NAVIGABLE_SCREENS: ReadonlySet<string> = new Set([
   "home",
   "applications",
   "members",
   "duplicates",
   "staff",
+  "data-reset",
 ]);
 
 interface NavItem {
@@ -269,6 +273,7 @@ export function AppShell() {
         )}
         {screen === "duplicates" && <MemberDuplicatesPage api={membersApi} />}
         {screen === "staff" && <StaffPage api={staffApi} />}
+        {screen === "data-reset" && <ResetPage api={demoResetApi} />}
       </main>
       <footer className="app-footer">
         <ul>

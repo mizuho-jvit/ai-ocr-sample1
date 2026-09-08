@@ -49,6 +49,10 @@ export interface TenantScopedExecutor {
     values: TenantUpdateValues<Row>,
     where: TenantScopedWhere,
   ): ScopedWriteOp;
+  prepareDelete(
+    table: TenantScopedTable,
+    where: TenantScopedWhere,
+  ): ScopedWriteOp;
   batch(operations: readonly ScopedWriteOp[]): Promise<void>;
 }
 
@@ -121,6 +125,8 @@ export function forTenant(
         withoutTenantId<Row>(values),
         scopedWhere(tenantId, where),
       ),
+    prepareDelete: (table: TenantScopedTable, where: SqlExpr) =>
+      executor.prepareDelete(table, scopedWhere(tenantId, where)),
     select: <Row extends TenantRow>(
       table: TenantScopedTable,
       where?: SqlExpr,

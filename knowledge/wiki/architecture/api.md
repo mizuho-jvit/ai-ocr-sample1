@@ -80,7 +80,7 @@ timestamp: 2026-08-31T00:00:00Z
 | 25 | POST | `/api/staff` | **admin** | `CreateStaffRequest` → `StaffUserSummary` | 201 / 401 / 403 / 422 | F-7-1 |
 | 26 | PATCH | `/api/staff/:id` | **admin** | `UpdateStaffRequest` → `StaffUserSummary` | 200 / 401 / 403 / 404 / **409** | F-7-1・[決定#44](../requirements/decisions.md) |
 | 27 | GET | `/api/demo/reset/preview` | **admin** | — → `ResetPreviewResponse` | 200 / 401 / 403 / **404** | F-9-6〜8 |
-| 28 | POST | `/api/demo/reset` | **admin** | `ResetRequest` → `ResetResponse` | 200 / 401 / 403 / **404** / 422 | F-9-6〜9 |
+| 28 | POST | `/api/demo/reset` | **admin** | `ResetRequest` → `ResetResponse` | 200 / 401 / 403 / **404** / **409** / 422 | F-9-6〜9・[決定#51](../requirements/decisions.md) |
 
 > **ルートの登録順に注意する。** Hono は登録順に照合するため、`/api/applications/export.csv`（#8）は `/api/applications/:id`（#9）より**先に**登録しないと `:id = "export.csv"` として一致する。`/api/members/match-candidates`（#16）・`/api/members/export.csv`（#17）・`/api/members/import`（#18）と `/api/members/:id`（#21）も同様。本表は**この順序どおりに並べてある。**
 
@@ -285,6 +285,7 @@ Workerはアプリ内セッションとテナントprefixを検証した後、R2
 - **admin のみ。API レベルで検証する**（F-9-6）
 - **確認語の入力を必須とする**（F-9-7）。`preview` が返す `confirmationWord` と完全一致しなければ実行しない。ボタン1つで実行できてはならない
 - 削除対象の件数（申請・画像・会員）を事前に提示する（F-9-7）
+- **`preview` が返す `snapshotToken` と完全一致しなければ実行しない**（F-9-7・[決定#51](../requirements/decisions.md)）。`preview` 表示後に対象（申請・非seed会員）が増減していれば一致せず、`409 INVALID_TRANSITION` で停止し再確認を求める（[決定#32](../requirements/decisions.md)・[決定#44](../requirements/decisions.md)と同じくINVALID_TRANSITIONを再利用）
 - 実行結果として削除件数を返し、**「当月のAI呼び出し上限は回復しない」旨を表示する**（F-9-9・NF-2-40）
 - 実行の事実（実行者・日時・削除件数）をログに出力する。**削除対象のテーブルには記録しない**（F-9-10）
 
@@ -302,7 +303,7 @@ Workerはアプリ内セッションとテナントprefixを検証した後、R2
 | `INVALID_CREDENTIALS` | 401 | ログイン失敗。**文言を「メールまたはパスワードが違います」に統一** | F-1-7 |
 | `FORBIDDEN` | 403 | staff が admin 専用APIを呼んだ | NF-2-11・F-7-2 |
 | `NOT_FOUND` | 404 | 存在しない、または**他テナントのレコード** | NF-5-16 |
-| `INVALID_TRANSITION` | 409 | 許可されないステータス遷移。名寄せ判断（#13）では、対象候補が`pending`/`hold`以外、または申請が`approved`の場合も含む。スタッフ編集（#26）では、最後の有効なadminを無効化・staffへ降格しようとした場合も含む | F-4-2・[決定#32](../requirements/decisions.md)・F-7-1・[決定#44](../requirements/decisions.md) |
+| `INVALID_TRANSITION` | 409 | 許可されないステータス遷移。名寄せ判断（#13）では、対象候補が`pending`/`hold`以外、または申請が`approved`の場合も含む。スタッフ編集（#26）では、最後の有効なadminを無効化・staffへ降格しようとした場合も含む。デモデータリセット（#28）では、`snapshotToken`が現在の削除対象集合と一致しない場合（`preview`表示後に対象が増減した）も含む | F-4-2・[決定#32](../requirements/decisions.md)・F-7-1・[決定#44](../requirements/decisions.md)・F-9-7・[決定#51](../requirements/decisions.md) |
 | `CHECK_RUN_LIMIT` | 409 | 再実施回数が上限 | NF-2-21 |
 | `VALIDATION_ERROR` | 422 | 入力値の不備 | — |
 | `USAGE_LIMIT_EXCEEDED` | 429 | 月次上限（fail closed） | NF-2-16・NF-2-20 |

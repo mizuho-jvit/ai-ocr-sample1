@@ -16,6 +16,22 @@ export interface SignedImageUrl {
   readonly expiresAt: string;
 }
 
+/**
+ * 🟡 Intent: コードレビュー指摘・P2・決定#52。`deleteMany`が複数バッチの途中で
+ * 失敗した場合、呼び出し側（`DemoResetService`）がそこまでに確定した削除件数を
+ * 監査ログへ残せるよう、失敗をこの型で伝える（件数を握り潰さない）。
+ */
+export class PartialImageDeleteError extends Error {
+  readonly deletedCount: number;
+
+  constructor(deletedCount: number, cause: unknown) {
+    super("R2 batch deletion failed partway through");
+    this.name = "PartialImageDeleteError";
+    this.deletedCount = deletedCount;
+    this.cause = cause;
+  }
+}
+
 export interface ImageStorage {
   put(
     tenantId: TenantId,
@@ -30,6 +46,16 @@ export interface ImageStorage {
     expiresInSeconds: number,
     trace?: OperationTrace,
   ): Promise<SignedImageUrl>;
+  /**
+   * F-9-11・F-9-12・決定#50。呼び出し側が確定した削除対象キー集合だけを、1000件ごとに
+   * 分割して削除する。`list`によるprefixの事後列挙は使わない
+   * （D1削除後に列挙すると、その間に完了した別リクエストの新規アップロードまで
+   * 削除してしまう競合があるため。コードレビュー指摘・P1）。
+   */
+  deleteMany(
+    imageKeys: readonly ImageKey[],
+    trace?: OperationTrace,
+  ): Promise<number>;
 }
 
 export interface ImageStorageOptions {
@@ -46,6 +72,9 @@ export interface ImageStorageOptions {
  * バケット名を変更する場合は両方を同時に書き換える必要がある。
  */
 const R2_BUCKET_NAME = "ai-ocr-sample1-images";
+
+/** 🔵 Intent: F-9-12。R2の1回の削除呼び出しあたりのキー数上限。 */
+const R2_DELETE_BATCH_SIZE = 1000;
 
 const R2_SIGNING_REGION = "auto";
 const R2_SIGNING_SERVICE = "s3";
@@ -212,6 +241,42 @@ export function createImageStorage(options: ImageStorageOptions): ImageStorage {
         trace,
         { ...R2_OPERATION_BASE, operation: "image.delete" },
         () => options.bucket.delete(imageKey),
+      );
+    },
+
+    /**
+     * 🔵 Intent: F-9-11・F-9-12・決定#50。削除対象は呼び出し側がD1削除より前に確定した
+     * `imageKeys`のみとする。`list`でprefixを事後列挙する方式は、D1削除からこの呼び出しまでの
+     * 間に完了した別リクエスト（OCR登録等）の新規アップロードまで削除してしまい、
+     * D1にはimageKey付きの申請が残るのに対応するR2オブジェクトが存在しないという不整合を
+     * 生む欠陥があった（コードレビュー指摘・P1）。
+     */
+    async deleteMany(imageKeys, trace) {
+      if (imageKeys.length === 0) {
+        return 0;
+      }
+      return executeOperation(
+        trace,
+        { ...R2_OPERATION_BASE, operation: "image.deleteMany" },
+        async () => {
+          let deletedCount = 0;
+          for (
+            let start = 0;
+            start < imageKeys.length;
+            start += R2_DELETE_BATCH_SIZE
+          ) {
+            const chunk = imageKeys.slice(start, start + R2_DELETE_BATCH_SIZE);
+            try {
+              await options.bucket.delete(chunk as string[]);
+            } catch (error) {
+              // 🟡 Intent: コードレビュー指摘・P2・決定#52。ここまでに確定した件数を
+              // 失敗の中に持たせ、呼び出し側が監査ログへ残せるようにする。
+              throw new PartialImageDeleteError(deletedCount, error);
+            }
+            deletedCount += chunk.length;
+          }
+          return deletedCount;
+        },
       );
     },
 

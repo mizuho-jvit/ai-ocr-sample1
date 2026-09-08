@@ -2,6 +2,44 @@
 
 <!-- 予約ファイル。フロントマターは付けない。日付見出し（ISO 8601）ごとに新しいものを上に追記する。 -->
 
+## 2026-09-08
+
+### Task 014へのcodexコードレビュー指摘(P2・2件目)への対応
+
+- **R2削除失敗時にD1を削除した事実が監査ログに残らない欠陥を修正した（決定#52）。** `emitDemoResetLog`（F-9-10）は③R2削除の成功後にしか呼ばれておらず、③が途中で失敗した場合、②で既に確定していたD1側の削除（申請・業務チェック履歴・名寄せ候補・申請ステータス履歴・非seed会員）の監査ログが一件も出力されなかった。通常の500エラーログ（`emitRequestLog`）はHTTP・トレース情報のみで実行者IDや削除件数を含まないため、「誰が何件D1から削除したか」を追跡できない状態が残っていた。
+- **修正: ③の呼び出しを`try/catch`で囲み、失敗時はD1側で確定済みの件数と実行者IDを記録してから元の例外を再throwする。** `emitDemoResetLog`は`outcome: "success" | "partial_failure"`を受け取るようにし、`success`なら`event: "demo_reset.completed"`・`level: "info"`、`partial_failure`なら`event: "demo_reset.failed"`・`level: "error"`を出す。複数バッチ（`ImageStorage.deleteMany`が1000件ごとに分割・決定#50）の途中で失敗した場合に「そこまで何件消せたか」を握り潰さないよう、`deleteMany`はバッチ単体の失敗を`PartialImageDeleteError`（`deletedCount`・`cause`を保持する例外型）へ包んで投げるようにした。`demo-reset.ts`はこの型なら`deletedCount`を、それ以外の例外なら0件をログのR2削除件数として使う。
+- **この監査ログはLOG-4「1リクエスト最大1件」の一般則に対する例外として扱う。** 低頻度の管理操作という前提で成功時にも1件のinfoを許可していた既存の例外（`observability.md`）を、失敗時にも拡張した。失敗時は当ログ（1件）に加え最上位境界の通常の失敗ログ（1件）も出るため合計2件になるが、D1が既に破壊的に変更済みであることを踏まえ、監査の欠落よりイベント予算の超過を許容する。
+- `test/worker/services/image-storage.test.ts`に、複数バッチの途中失敗で`PartialImageDeleteError.deletedCount`が正しい件数を持つことを確認するテストを追加した。`test/worker/services/demo-reset.test.ts`に、R2削除が失敗してもD1側の削除件数・実行者IDを含む`error`イベントが出ること、複数バッチ途中の部分件数が正しく記録されること、成功時は`info`イベントが出ること、ログ出力自体の失敗がAPIの結果（例外の伝播）を変えないことを確認するテストを追加した。`test/worker/observability/logger.test.ts`にも`outcome: "partial_failure"`のテストを追加した。ナイーブな実装（try/catchを外す）に一時的に戻すと、これらのテストが確実に失敗することを確認済み。`knowledge/wiki/architecture/observability.md`の「イベント予算の規則」・`requirements/functional.md`（F-9-10）を更新した。
+
+### Task 014へのcodexコードレビュー指摘(P2)への対応
+
+- **確認画面で提示した件数より多くのデータを削除できる欠陥を修正した（決定#51）。** `GET /api/demo/reset/preview`が返す件数と`POST /api/demo/reset`実行時にサービスが再取得する削除対象は紐づいておらず、確認語も固定値`RESET`のためpreview時点の対象集合を識別しなかった。preview表示後に別リクエスト（他の職員によるOCR登録・会員登録等）が申請や非seed会員を追加すると、管理者が画面で確認した件数より多いデータが無警告で削除され得た。F-9-7の「削除対象の件数を事前に表示したうえで確認させる」安全策が、実際の削除対象に対して成立していなかった。
+- **修正: `ResetPreviewResponse`・`ResetRequest`へ`snapshotToken`（削除対象集合のダイジェスト）を追加した。** `snapshotToken`は削除対象になる申請ID全件・非seed会員ID全件をそれぞれソートしJSON直列化した文字列のSHA-256ダイジェスト（`demo-reset.ts`の`computeSnapshotToken`）で、対象集合が1件でも増減すれば値が変わる。`DemoResetService.reset`は`countPendingDeletion()`（①削除対象の収集）の直後・②のD1削除より前にリクエストの`snapshotToken`と実行時点の値を比較し、**不一致なら削除を一切実行せず`409 INVALID_TRANSITION`で拒否する**（名寄せ判断・スタッフ編集と同じくINVALID_TRANSITIONを再利用。決定#32・#44）。件数の一致だけを見る簡易案は、同数の追加・削除が同時に起きると見逃すため採らず、対象集合そのものの同一性を検証する方式にした。
+- **①のSELECTより後・②の実行より前に対象が増減した場合は、②の`whereAll()`削除が実行時点の全行を対象にするため、その増分がそのまま削除される。** これは決定#50の残存レースと同じ性質で、「D1に残るがpreviewに出ていない」不整合ではなく「削除されるがpreviewには出ていなかった」という別のズレであり、商談前後にのみ実行する単一操作という運用では実害が小さいと判断し、追加のロック機構までは設けなかった。
+- SPA側（`reset-page.tsx`）は`preview`が返した`snapshotToken`をそのまま`reset`へ渡すようにし、エラー時（409を含む）は`preview`を再取得して最新の件数を表示し直す（再確認を促す）。
+- `test/worker/services/demo-reset.test.ts`に、preview後に申請・非seed会員が追加された場合に削除せず409を返すこと、対象が変化していなければ成功することを確認するテストを追加した。`test/worker/routes/demo.test.ts`・`test/react-app/api/demo-reset.test.ts`・`test/react-app/pages/reset-page.test.tsx`にも409の伝播・再確認UIのテストを追加した。ナイーブな実装（この検証を外す）に一時的に戻すと、対象追加後の拒否を確認するテストが確実に失敗することを確認済み。`knowledge/wiki/architecture/types.md`・`api.md`・`requirements/functional.md`（F-9-7）・`requirements/acceptance.md`・`architecture/dataflow.md`のmermaid図と根拠表を更新した。
+
+### Task 014へのcodexコードレビュー指摘(P1)への対応
+
+- **OCR登録とリセットの並行実行で、画像だけ失われた申請が残る欠陥を修正した（決定#50）。** 当初実装は、②D1削除が完了した後に③`ImageStorage.deleteAllForTenant`がR2の`{tenantId}/`prefixを事後列挙して削除していた。②→③の間に完了した別リクエスト（デモ中のOCR登録・`POST /api/ocr/extract`）がR2へ新しい画像を保存し終えていた場合、③のprefix列挙はテナント内の「今その時点でR2に存在するオブジェクト」を無条件に対象にするため、その新しい画像もまとめて削除してしまう。結果、D1にはリセット後に新規登録された`imageKey`付きの申請が残るのに対応するR2オブジェクトが存在しないという、F-9-11がまさに避けようとしていた不整合（画像を失った申請レコード）が「D1→R2の削除順序」とは別の経路から発生し得た。
+- **修正: R2の削除対象を、①（削除対象`imageKey`の収集）の時点で確定した集合に限定する。** `ImageStorage.deleteAllForTenant(tenantId)`（`R2Bucket.list`によるprefix列挙→`delete`）を`deleteMany(imageKeys)`（呼び出し側が渡した固定のキー配列を1000件ごとに`delete`するだけ）へ置き換えた。`DemoResetService`は`countPendingDeletion()`が②のD1削除より前に読み取った`imageKeys`のスナップショットをそのまま③へ渡す。`ResetResponse.deleted.images`は`deleteMany`の戻り値（渡したキー数）を使う。
+- この変更後も、①のSELECTと②のD1削除実行の間に新規申請が挿入された場合は、②の`whereAll()`削除がその新しい申請行も無条件に削除するため、その申請とR2オブジェクトが揃って消えるだけで「D1に残るがR2には無い」という不整合は発生しない。一方、①のSELECTより前にR2へ保存済みだが対応するD1行がまだ無い（＝OCR処理が申請作成の途中である）オブジェクトは①の集合に含まれないため③で削除されず、その申請が後から正常に登録されれば画像も保持される。
+- `test/worker/services/demo-reset.test.ts`に、①で確定した集合以外は削除対象に含まれないことを確認するテストを追加した。ナイーブな実装（新しいキーを1件追加で混入させる）に一時的に戻すと、このテストと既存の削除対象アサーションが確実に失敗することを確認済み。`test/worker/services/image-storage.test.ts`も`deleteAllForTenant`用のテストを`deleteMany`用（固定キー配列の削除・1000件超の分割・空配列での早期リターン）へ差し替えた。`knowledge/wiki/requirements/functional.md`のF-9-12・`architecture/dataflow.md`のmermaid図と根拠表を更新した。
+
+### デモデータリセットを実装した（Task 014）
+
+- **`GET /api/demo/reset/preview`（api.md #27）・`POST /api/demo/reset`（#28）を実装した。** ルート（`src/worker/routes/demo.ts`）は`ALLOW_DATA_RESET`未設定なら`403`より先に`404`（F-9-8。機能の存在自体を露出させない）、次にadmin確認（F-9-6）を行う`demoResetGuard`だけを持ち、業務ロジックは新設の`DemoResetService`（`src/worker/services/demo-reset.ts`）へ委ねた（`staff-service.ts`と同じ責務分離）。確認語は`RESET`固定（ランダム生成しない。IMEを経由せず入力できる値・api.md設計判断#5）。
+- **F-9-11の削除順序（①imageKey相当の件数収集→②D1削除→③R2削除）をそのまま実装した。** `applications.latestCheckRunId`と`check_runs.applicationId`が循環参照のため、②の中でも`check_runs`を消す前に`applications.latestCheckRunId`をNULLへ更新する必要がある（既存テスト間クリーンアップ`business-check.test.ts`と同じ制約）。②全体を`D1Database.batch`（単一トランザクション）で原子的に行うため、`TenantScopedRepositories`に`prepareDelete`・テナント全体を対象にする`whereAll()`を追加した（決定#49）。
+- **R2の削除は個々の`imageKey`を追跡せず、`{tenantId}/`prefixの列挙により行う（F-9-12）。** `ImageStorage`（`src/worker/services/image-storage.ts`）へ`deleteAllForTenant`を追加し、`R2Bucket.list`のカーソルページングで1000件ごとに`delete`する。`ResetResponse.deleted.images`にはD1側のimageKey件数ではなくこの実測値（R2側で実際に削除できた件数）を採用した（過去の失敗で残った参照無しオブジェクトも含めて正しく報告するため）。
+- **F-9-10（実行の事実をログへ出力する）は、LOG-5「正常リクエストはInvocation Logのみ」の一般則に対する明示的な例外として実装した。** `StaffUser`/`Member`の更新記録列（決定#16）はF-9で行そのものが削除されるため使えず、他に監査手段が無いため`emitDemoResetLog`（`observability/logger.ts`）を新設し、実行者ID・削除件数だけを1件出力する（個人情報・帳票・SQL値は含めない・LOG-8）。
+- SPA側は`src/react-app/{api/demo-reset.ts,pages/reset-page.tsx}`を新規実装し、`AppShell`のナビメニューから「デモデータ初期化」（admin限定・`ALLOW_DATA_RESET`有効時のみ）を有効化した。画面は削除対象の件数表示・確認語入力・実行結果表示（F-9-9「当月のAI呼び出し上限は回復しない」旨を含む）を1画面で完結させる（`screen-list.md`が定める唯一の画面）。
+
+### Task 013・014の着手順を確定した（決定#48）
+
+- Task 012完了時点で残っていたTask 013（CSV入出力）・Task 014（デモデータリセット）のどちらから着手するかをユーザーへ相談した。Task 015・016はいずれもTask 013・014の両方に依存するため、この判断は後続タスク全体の着手可否に波及する。
+- **Task 014（デモデータリセット・F-9）を先行して実装し、Task 013（CSV入出力・F-8）はこのリリースでは後回しにする方針で確定した。** 単一のデモ環境を全商談で共用する運用（制約事項#3-2）を直接支えるのがTask 014であり、無いと商談前後にD1を直接操作して手動でデータを掃除する運用コストが発生する一方、Task 013は中核フロー（OCR読取→業務チェック→トリアージ→承認→会員登録・検索）に影響しない単純な便利機能であるため。**F-8の要件自体は撤回しない。実装リリースの順序のみを定める判断であり、機能一覧に変更はない。**
+- 帰結として、Task 013へ依存するTask 015（API統合・テナント分離テスト）・Task 016（E2E・性能検証・運用手順）もこのリリースでは着手できないままになる。`docs/dev/context.md`のCurrent Development Stateを更新した。
+
 ## 2026-09-07
 
 ### Task 012（スタッフ管理）へのcodexレビュー指摘への対応

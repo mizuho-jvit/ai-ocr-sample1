@@ -58,6 +58,11 @@ export interface TableRepository<
     values: Partial<WithoutTenant<Row>>,
     where: SqlExpr,
   ): ScopedWriteOp;
+  /**
+   * `delete`と同じ削除を、実行せず`TenantScopedRepositories.runTransaction`へ
+   * 渡すためだけに構築する（決定#49・F-9-11の複数テーブル削除を単一トランザクションにする）。
+   */
+  prepareDelete(where: SqlExpr): ScopedWriteOp;
 }
 
 /**
@@ -192,6 +197,8 @@ function tableRepository<Row extends TenantRow, Insert extends TenantRow>(
         table,
         values as unknown as WithoutTenant<Row>,
       ),
+    prepareDelete: (where: SqlExpr) =>
+      scopedDatabase.prepareDelete(table, where),
     prepareUpdate: (values: Partial<WithoutTenant<Row>>, where: SqlExpr) =>
       scopedDatabase.prepareUpdate<Row>(table, values, where),
     update: (values: Partial<WithoutTenant<Row>>, where: SqlExpr) =>
@@ -368,4 +375,4 @@ export function whereFieldEquals<
   return whereEquals(tableName, columnName, value);
 }
 
-export { whereOtherMergedMatchCandidates } from "./client";
+export { whereAll, whereOtherMergedMatchCandidates } from "./client";

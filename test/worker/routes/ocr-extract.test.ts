@@ -85,6 +85,7 @@ function fakeImageStorage(overrides: Partial<ImageStorage> = {}): ImageStorage {
       url: "https://signed.example.test/tenant/app.jpg",
     })),
     delete: vi.fn(async () => undefined),
+    deleteMany: vi.fn(async () => 0),
     put: vi.fn(async (tenantId, applicationId) =>
       toImageKey(`${tenantId}/${applicationId}.jpg`),
     ),

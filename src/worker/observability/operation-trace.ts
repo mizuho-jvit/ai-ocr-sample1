@@ -41,6 +41,7 @@ export type OperationName =
   | "gemini.generateStructured"
   | "image.put"
   | "image.delete"
+  | "image.deleteMany"
   | "repository.batch"
   | `${DatabaseTable}.${DatabaseAction}`;
 

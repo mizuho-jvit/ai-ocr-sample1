@@ -519,11 +519,22 @@ export interface ResetPreviewResponse {
   members: number;
   /** 入力を求める確認語。画面にそのまま表示する */
   confirmationWord: string;
+  /**
+   * この時点の削除対象集合（申請ID・非seed会員ID）から算出したダイジェスト。
+   * `POST /api/demo/reset` はこの値が現在の対象集合と一致する場合のみ実行する
+   * （F-9-7・[決定#51](../requirements/decisions.md)）。
+   */
+  snapshotToken: string;
 }
 
 export interface ResetRequest {
   /** ResetPreviewResponse.confirmationWord と完全一致しなければ実行しない（F-9-7） */
   confirmation: string;
+  /**
+   * ResetPreviewResponse.snapshotToken と完全一致しなければ実行しない
+   * （F-9-7・[決定#51](../requirements/decisions.md)）。不一致なら`409 INVALID_TRANSITION`。
+   */
+  snapshotToken: string;
 }
 
 export interface ResetResponse {

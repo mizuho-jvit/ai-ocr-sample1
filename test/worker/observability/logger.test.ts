@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { emitRequestLog } from "../../../src/worker/observability/logger";
+import {
+  emitDemoResetLog,
+  emitRequestLog,
+} from "../../../src/worker/observability/logger";
 import {
   createOperationTrace,
   recordOperationFailure,
 } from "../../../src/worker/observability/operation-trace";
+import { toStaffUserId } from "../../../src/worker/types";
 
 describe("structured logger", () => {
   it("emits at most one safe structured event per request", () => {
@@ -110,5 +114,85 @@ describe("structured logger", () => {
 
     expect(sink.error).not.toHaveBeenCalled();
     expect(sink.warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("emitDemoResetLog (F-9-10)", () => {
+  it("emits a single info event with the execution fact and delete counts", () => {
+    const sink = { error: vi.fn(), info: vi.fn(), warn: vi.fn() };
+
+    emitDemoResetLog(
+      {
+        deletedApplications: 3,
+        deletedImages: 2,
+        deletedMembers: 1,
+        executedById: toStaffUserId("staff-1"),
+        outcome: "success",
+      },
+      sink,
+    );
+
+    expect(sink.info).toHaveBeenCalledOnce();
+    const event = sink.info.mock.calls[0]?.[0];
+    expect(event).toMatchObject({
+      deletedApplications: 3,
+      deletedImages: 2,
+      deletedMembers: 1,
+      event: "demo_reset.completed",
+      executedById: "staff-1",
+      level: "info",
+    });
+  });
+
+  // コードレビュー指摘・P2・決定#52: R2削除が途中で失敗しても、D1を削除した事実
+  // （実行者・D1側の削除件数）を失わずに記録する。
+  it("emits an error-level event with the D1-confirmed counts when R2 deletion only partially completed", () => {
+    const sink = { error: vi.fn(), info: vi.fn(), warn: vi.fn() };
+
+    emitDemoResetLog(
+      {
+        deletedApplications: 3,
+        deletedImages: 1,
+        deletedMembers: 1,
+        executedById: toStaffUserId("staff-1"),
+        outcome: "partial_failure",
+      },
+      sink,
+    );
+
+    expect(sink.error).toHaveBeenCalledOnce();
+    expect(sink.info).not.toHaveBeenCalled();
+    const event = sink.error.mock.calls[0]?.[0];
+    expect(event).toMatchObject({
+      deletedApplications: 3,
+      deletedImages: 1,
+      deletedMembers: 1,
+      event: "demo_reset.failed",
+      executedById: "staff-1",
+      level: "error",
+    });
+  });
+
+  it("does not let a logging failure change application control flow", () => {
+    const sink = {
+      error: vi.fn(),
+      info: vi.fn(() => {
+        throw new Error("logging unavailable");
+      }),
+      warn: vi.fn(),
+    };
+
+    expect(() =>
+      emitDemoResetLog(
+        {
+          deletedApplications: 0,
+          deletedImages: 0,
+          deletedMembers: 0,
+          executedById: toStaffUserId("staff-1"),
+          outcome: "success",
+        },
+        sink,
+      ),
+    ).not.toThrow();
   });
 });

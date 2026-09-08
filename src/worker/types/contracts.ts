@@ -131,6 +131,10 @@ export interface ScopedDb {
     where: SqlExpr,
   ): ScopedWriteOp;
   /**
+   * 実行を伴わずdeleteを構築する。`batch`へ渡すためだけに使う（決定#49・F-9-11）。
+   */
+  prepareDelete(table: TenantScopedTable, where: SqlExpr): ScopedWriteOp;
+  /**
    * `operations`をすべて成功するか、すべて失敗するかのいずれかで実行する
    * (D1のbatch APIが提供する単一トランザクション)。
    */
@@ -425,10 +429,18 @@ export interface ResetPreviewResponse {
   images: number;
   members: number;
   confirmationWord: string;
+  /**
+   * この時点の削除対象集合(申請ID・非seed会員ID)から算出したダイジェスト。
+   * `POST /api/demo/reset`はこの値が現在の対象集合と一致する場合のみ実行する
+   * (決定#51・コードレビュー指摘・P2)。
+   */
+  snapshotToken: string;
 }
 
 export interface ResetRequest {
   confirmation: string;
+  /** ResetPreviewResponse.snapshotTokenと完全一致しなければ実行しない(決定#51)。 */
+  snapshotToken: string;
 }
 
 export interface ResetResponse {

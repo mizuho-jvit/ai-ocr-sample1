@@ -1,7 +1,7 @@
 ---
 id: "014"
 title: "デモデータリセットを実装"
-status: pending
+status: done
 priority: 2
 dependencies: ["002", "003"]
 estimated_complexity: high
@@ -22,10 +22,10 @@ function resetDemoData(input: ResetRequest, actor: SessionActor): Promise<ResetR
 
 ## Test Strategy
 
-- [ ] 無効設定なら404、staffなら403、確認語不一致なら422で削除しない。
-- [ ] previewで申請・画像・非seed会員数と確認語を返す。
-- [ ] imageKey収集→子からD1削除→1000件単位R2削除の順に実行する。
-- [ ] seed会員、職員、Tenant、Session、UsageCounterを保持する。
+- [x] 無効設定なら404、staffなら403、確認語不一致なら422で削除しない。
+- [x] previewで申請・画像・非seed会員数と確認語を返す。
+- [x] imageKey収集→子からD1削除→1000件単位R2削除の順に実行する。
+- [x] seed会員、職員、Tenant、Session、UsageCounterを保持する。
 
 ## Implementation Notes
 

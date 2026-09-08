@@ -6,6 +6,7 @@ import type { OperationTrace } from "../observability/operation-trace";
 import type { ApplicationService } from "../services/application-service";
 import type { AuthService, SessionActor } from "../services/auth";
 import type { BusinessCheckService } from "../services/business-check";
+import type { DemoResetService } from "../services/demo-reset";
 import type { ImageStorage } from "../services/image-storage";
 import type { MemberService } from "../services/member-service";
 import type { StaffService } from "../services/staff-service";
@@ -29,6 +30,7 @@ export type AppHonoEnv = {
     auth: AuthService;
     businessCheck: BusinessCheckService;
     config: AppConfig;
+    demoReset: DemoResetService;
     imageStorage: ImageStorage;
     memberService: MemberService;
     ocrPipeline: OcrPipeline;

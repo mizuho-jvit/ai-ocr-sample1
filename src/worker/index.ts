@@ -23,6 +23,7 @@ import {
   createPublicAuthRoutes,
 } from "./routes/auth";
 import { createCheckRoutes } from "./routes/checks";
+import { createDemoRoutes } from "./routes/demo";
 import { createMemberRoutes } from "./routes/members";
 import {
   createApplicationImageRoutes,
@@ -40,6 +41,10 @@ import {
   type BusinessCheckService,
   createBusinessCheckService,
 } from "./services/business-check";
+import {
+  createDemoResetService,
+  type DemoResetService,
+} from "./services/demo-reset";
 import {
   createImageStorage,
   type ImageStorage,
@@ -117,6 +122,7 @@ export function createApp(
   providedApplicationService?: ApplicationService,
   providedMemberService?: MemberService,
   providedStaffService?: StaffService,
+  providedDemoResetService?: DemoResetService,
 ): Hono<AppHonoEnv> {
   const app = new Hono<AppHonoEnv>();
 
@@ -135,16 +141,15 @@ export function createApp(
       providedOcrPipeline ??
         createOcrPipeline({ apiKey: env.GEMINI_API_KEY, config, trace }),
     );
-    context.set(
-      "imageStorage",
+    const imageStorage =
       providedImageStorage ??
-        createImageStorage({
-          accessKeyId: env.R2_S3_ACCESS_KEY_ID,
-          accountId: config.r2AccountId,
-          bucket: env.BUCKET,
-          secretAccessKey: env.R2_S3_SECRET_ACCESS_KEY,
-        }),
-    );
+      createImageStorage({
+        accessKeyId: env.R2_S3_ACCESS_KEY_ID,
+        accountId: config.r2AccountId,
+        bucket: env.BUCKET,
+        secretAccessKey: env.R2_S3_SECRET_ACCESS_KEY,
+      });
+    context.set("imageStorage", imageStorage);
     context.set(
       "businessCheck",
       providedBusinessCheck ??
@@ -168,6 +173,11 @@ export function createApp(
     context.set(
       "staffService",
       providedStaffService ?? createStaffService({ config, repository }),
+    );
+    context.set(
+      "demoReset",
+      providedDemoResetService ??
+        createDemoResetService({ config, imageStorage, repository }),
     );
     try {
       await executeOperation(
@@ -221,6 +231,9 @@ export function createApp(
   protectedApi.route("/members", createMemberRoutes());
   // api.md #24〜26（スタッフ管理）。adminのみ(F-7-2)はcreateStaffRoutes内のadminGuardで検証する。
   protectedApi.route("/staff", createStaffRoutes());
+  // api.md #27〜28（デモデータリセット）。ALLOW_DATA_RESET未設定なら404(F-9-8)は
+  // createDemoRoutes内のdemoResetGuardで検証する。
+  protectedApi.route("/demo", createDemoRoutes());
   // app.route はサブアプリのスナップショットを再生するため、搭載は登録の後に行う。
   app.route("/api", protectedApi);
 

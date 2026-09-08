@@ -164,6 +164,12 @@ function createExecutor(
         client.insert(table).values(values as Record<string, unknown>),
       );
     },
+    prepareDelete(tableName: TenantScopedTable, where: TenantScopedWhere) {
+      const table = tableFor(tableName);
+      return wrapBatchItem(
+        client.delete(table).where(expressionFor(where, table)),
+      );
+    },
     prepareUpdate<Row extends { tenantId: string }>(
       tableName: TenantScopedTable,
       values: Partial<Omit<Row, "tenantId">>,
@@ -280,6 +286,15 @@ export function whereEquals(
     columnName
   ];
   return drizzleWhere(eq(column, value));
+}
+
+/**
+ * 🔵 Intent: F-9-1・F-9-11。テナント全体を対象に削除・更新するとき、追加条件を持たない
+ * `SqlExpr`が必要になる（`expressionFor`はテナント条件と`and`で結合するだけの常真式を要求する）。
+ * 列を指定しない`whereEquals`相当として決定#49で追加した。
+ */
+export function whereAll(): SqlExpr {
+  return drizzleWhere(sql`1 = 1`);
 }
 
 /**

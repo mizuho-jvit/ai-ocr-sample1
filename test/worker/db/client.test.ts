@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { whereEquals } from "../../../src/worker/db/client";
+import { whereAll, whereEquals } from "../../../src/worker/db/client";
+
+describe("whereAll (決定#49・F-9-11)", () => {
+  it("builds a predicate without throwing", () => {
+    expect(() => whereAll()).not.toThrow();
+  });
+});
 
 describe("whereEquals", () => {
   it("builds a predicate for a real column", () => {
