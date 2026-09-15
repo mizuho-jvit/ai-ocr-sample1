@@ -42,6 +42,10 @@ describe("Worker entry point", () => {
 
     expect(response.status).toBe(401);
     expect(response.headers.get("WWW-Authenticate")).toContain("Basic");
+    expect(response.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
+    expect(response.headers.get("Content-Security-Policy")).toBe(
+      "frame-ancestors 'self'",
+    );
   });
 
   it("delegates an authenticated request to the assets binding", async () => {
@@ -59,6 +63,10 @@ describe("Worker entry point", () => {
     await expect(response.text()).resolves.toBe("asset response");
     expect(env.ASSETS.fetch).toHaveBeenCalledOnce();
     expect(response.headers.get("X-Request-Id")).toBeTruthy();
+    expect(response.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
+    expect(response.headers.get("Content-Security-Policy")).toBe(
+      "frame-ancestors 'self'",
+    );
   });
 
   it("returns and logs a safe error when startup validation fails", async () => {
@@ -73,6 +81,10 @@ describe("Worker entry point", () => {
 
     expect(response.status).toBe(500);
     expect(response.headers.get("X-Request-Id")).toBeTruthy();
+    expect(response.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
+    expect(response.headers.get("Content-Security-Policy")).toBe(
+      "frame-ancestors 'self'",
+    );
     await expect(response.json()).resolves.toEqual({
       error: {
         code: "INTERNAL",
@@ -107,6 +119,10 @@ describe("Worker entry point", () => {
 
     expect(response.status).toBe(500);
     expect(response.headers.get("X-Request-Id")).toBeTruthy();
+    expect(response.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
+    expect(response.headers.get("Content-Security-Policy")).toBe(
+      "frame-ancestors 'self'",
+    );
     expect(await response.text()).not.toContain(secret);
     expect(logError).toHaveBeenCalledOnce();
     expect(JSON.stringify(logError.mock.calls[0]?.[0])).not.toContain(secret);

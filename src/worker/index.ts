@@ -101,6 +101,10 @@ function errorResponse(error: unknown): Response {
 function withRequestId(response: Response, requestId: string): Response {
   const headers = new Headers(response.headers);
   headers.set("X-Request-Id", requestId);
+  // クリックジャッキング対策(IPA「安全なウェブサイトの作り方」7.6章)。
+  // このアプリを他オリジンのiframeに埋め込む用途はなく、自己オリジンのみ許可する。
+  headers.set("X-Frame-Options", "SAMEORIGIN");
+  headers.set("Content-Security-Policy", "frame-ancestors 'self'");
   return new Response(response.body, {
     headers,
     status: response.status,
@@ -193,6 +197,11 @@ export function createApp(
       );
     } finally {
       context.header("X-Request-Id", trace.requestId);
+      // クリックジャッキング対策(IPA「安全なウェブサイトの作り方」7.6章)。
+      // withRequestId()側にも同じ設定があるが、成功パスはこのミドルウェアの
+      // context.header()を経由するため、ここでも同じ値を付与する。
+      context.header("X-Frame-Options", "SAMEORIGIN");
+      context.header("Content-Security-Policy", "frame-ancestors 'self'");
       if (!trace.failure) {
         finalizeOperationTrace(trace, "response.created");
       }
