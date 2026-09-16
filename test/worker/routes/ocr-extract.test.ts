@@ -35,7 +35,26 @@ const EXTRACTED: ExtractedApplication = {
   ],
 };
 
+// SOI・SOF0(10x10)・EOIのみの最小JPEG。マジックナンバー・寸法検証を通す実データ。
 const VALID_IMAGE = {
+  base64: "/9j/wAALCAAKAAoBAREA/9k=",
+  mimeType: "image/jpeg",
+};
+
+// PNG署名・IHDR(10x10)のみの最小PNG。
+const VALID_PNG_IMAGE = {
+  base64: "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAK",
+  mimeType: "image/png",
+};
+
+// SOF0の高さを3000(長辺上限2000pxを超える)にした以外はVALID_IMAGEと同じ。
+const OVERSIZED_DIMENSION_IMAGE = {
+  base64: "/9j/wAALCAALuAoBAREA/9k=",
+  mimeType: "image/jpeg",
+};
+
+// マジックナンバーを持たない、旧実装なら通っていた任意バイト列。
+const NON_IMAGE_BYTES = {
   base64: "ZmFrZS1pbWFnZS1ieXRlcw==",
   mimeType: "image/jpeg",
 };
@@ -259,6 +278,142 @@ describe("POST /api/ocr/extract (F-2-8・F-2-9・NF-2-39)", () => {
       environment,
     );
     await expect(usageResponse.json()).resolves.toMatchObject({ ocrPages: 0 });
+  });
+
+  it("accepts a real PNG image (IPA診断・OCR入力検証)", async () => {
+    const cookie = await loginCookie();
+    const environment = createTestEnv();
+    const app = createApp(
+      environment,
+      undefined,
+      undefined,
+      undefined,
+      fakeOcrPipeline(),
+      fakeImageStorage(),
+    );
+
+    const response = await app.fetch(
+      jsonRequest("/api/ocr/extract", { image: VALID_PNG_IMAGE }, cookie),
+      environment,
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it("rejects a base64 string exceeding the 2MB decoded size limit with 422 (IPA診断・OCR入力検証)", async () => {
+    const cookie = await loginCookie();
+    const environment = createTestEnv();
+    const ocrPipeline = fakeOcrPipeline();
+    const imageStorage = fakeImageStorage();
+    const app = createApp(
+      environment,
+      undefined,
+      undefined,
+      undefined,
+      ocrPipeline,
+      imageStorage,
+    );
+
+    // 3,000,000文字のBase64は2MB上限を優に超える(有効な文字集合だが長さで先に弾かれる)。
+    const oversizedBase64 = "A".repeat(3_000_000);
+    const response = await app.fetch(
+      jsonRequest(
+        "/api/ocr/extract",
+        { image: { base64: oversizedBase64, mimeType: "image/jpeg" } },
+        cookie,
+      ),
+      environment,
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "VALIDATION_ERROR" },
+    });
+    expect(ocrPipeline.extract).not.toHaveBeenCalled();
+    expect(imageStorage.put).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed base64 string with 422 (IPA診断・OCR入力検証)", async () => {
+    const cookie = await loginCookie();
+    const environment = createTestEnv();
+    const ocrPipeline = fakeOcrPipeline();
+    const app = createApp(
+      environment,
+      undefined,
+      undefined,
+      undefined,
+      ocrPipeline,
+      fakeImageStorage(),
+    );
+
+    const response = await app.fetch(
+      jsonRequest(
+        "/api/ocr/extract",
+        { image: { base64: "not-valid-base64!!", mimeType: "image/jpeg" } },
+        cookie,
+      ),
+      environment,
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "VALIDATION_ERROR" },
+    });
+    expect(ocrPipeline.extract).not.toHaveBeenCalled();
+  });
+
+  it("rejects bytes whose magic number does not match the declared mimeType with 422 (IPA診断・OCR入力検証)", async () => {
+    const cookie = await loginCookie();
+    const environment = createTestEnv();
+    const ocrPipeline = fakeOcrPipeline();
+    const app = createApp(
+      environment,
+      undefined,
+      undefined,
+      undefined,
+      ocrPipeline,
+      fakeImageStorage(),
+    );
+
+    const response = await app.fetch(
+      jsonRequest("/api/ocr/extract", { image: NON_IMAGE_BYTES }, cookie),
+      environment,
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "VALIDATION_ERROR" },
+    });
+    expect(ocrPipeline.extract).not.toHaveBeenCalled();
+  });
+
+  it("rejects an image whose long edge exceeds the 2000px limit with 422 (IPA診断・OCR入力検証)", async () => {
+    const cookie = await loginCookie();
+    const environment = createTestEnv();
+    const ocrPipeline = fakeOcrPipeline();
+    const app = createApp(
+      environment,
+      undefined,
+      undefined,
+      undefined,
+      ocrPipeline,
+      fakeImageStorage(),
+    );
+
+    const response = await app.fetch(
+      jsonRequest(
+        "/api/ocr/extract",
+        { image: OVERSIZED_DIMENSION_IMAGE },
+        cookie,
+      ),
+      environment,
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "VALIDATION_ERROR" },
+    });
+    expect(ocrPipeline.extract).not.toHaveBeenCalled();
   });
 
   it("returns 429 without calling the pipeline once the monthly OCR page limit is reached (NF-2-18)", async () => {
