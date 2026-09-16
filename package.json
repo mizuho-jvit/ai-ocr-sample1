@@ -19,8 +19,8 @@
     "db:seed": "wrangler d1 execute DB --local --file=scripts/db/seed.sql"
   },
   "dependencies": {
-    "drizzle-orm": "^0.44.7",
-    "hono": "4.11.1",
+    "drizzle-orm": "^0.45.2",
+    "hono": "4.12.34",
     "react": "19.2.1",
     "react-dom": "19.2.1"
   },

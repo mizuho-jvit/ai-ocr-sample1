@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       drizzle-orm:
-        specifier: ^0.44.7
-        version: 0.44.7
+        specifier: ^0.45.2
+        version: 0.45.2
       hono:
-        specifier: 4.11.1
-        version: 4.11.1
+        specifier: 4.12.34
+        version: 4.12.34
       react:
         specifier: 19.2.1
         version: 19.2.1
@@ -1437,8 +1437,8 @@ packages:
     resolution: {integrity: sha512-7OZcmQUrdGI+DUNNsKBn1aW8qSoKuTH7d0mYgSP8bAzdFzKoovxEFnoGQp2dVs82EOJeYycqRtciopszwUf8bw==}
     hasBin: true
 
-  drizzle-orm@0.44.7:
-    resolution: {integrity: sha512-quIpnYznjU9lHshEOAYLoZ9s3jweleHlZIAWR/jX9gAWNg/JhQ1wj0KGRf7/Zm+obRrYd9GjPVJg790QY9N5AQ==}
+  drizzle-orm@0.45.2:
+    resolution: {integrity: sha512-kY0BSaTNYWnoDMVoyY8uxmyHjpJW1geOmBMdSSicKo9CIIWkSxMIj2rkeSR51b8KAPB7m+qysjuHme5nKP+E5Q==}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
       '@cloudflare/workers-types': '>=4'
@@ -1598,8 +1598,8 @@ packages:
     resolution: {integrity: sha512-7uMYJu2SEwwL8vVcKp0C0lnt6d2LSGGe+T+oY79PiCJNNSgFpbxW8n5KuzpDQvrU4mt+fYiK1+Jy7Z2v39YR6g==}
     engines: {node: '>=20.0.0'}
 
-  hono@4.11.1:
-    resolution: {integrity: sha512-KsFcH0xxHes0J4zaQgWbYwmz3UPOOskdqZmItstUG93+Wk1ePBLkLGwbP9zlmh1BFUiL8Qp+Xfu9P7feJWpGNg==}
+  hono@4.12.34:
+    resolution: {integrity: sha512-GqXJqY/xJkJmuloTrnV1ZEXG3fqte+VjkUqoRNZXcrUidiUOP4fMSIHHY4tsqZBK++kVyWmt/AAfSUuy57/eSA==}
     engines: {node: '>=16.9.0'}
 
   js-tokens@4.0.0:
@@ -2881,7 +2881,7 @@ snapshots:
       esbuild: 0.25.12
       tsx: 4.23.12
 
-  drizzle-orm@0.44.7: {}
+  drizzle-orm@0.45.2: {}
 
   electron-to-chromium@1.5.414: {}
 
@@ -3037,7 +3037,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  hono@4.11.1: {}
+  hono@4.12.34: {}
 
   js-tokens@4.0.0: {}
 
