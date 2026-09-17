@@ -317,6 +317,81 @@ describe("POST /api/auth/logout (F-1-10)", () => {
 
     expect(response.status).toBe(401);
   });
+
+  it("rejects a cross-origin logout with 403 and keeps the session valid (CSRF)", async () => {
+    const cookie = sessionCookieFrom(await login());
+
+    const forged = await createApp(createTestEnv()).fetch(
+      request("/api/auth/logout", {
+        cookie,
+        headers: { Origin: "https://evil.test" },
+        method: "POST",
+      }),
+      createTestEnv(),
+    );
+
+    expect(forged.status).toBe(403);
+    await expect(forged.json()).resolves.toMatchObject({
+      error: { code: "FORBIDDEN" },
+    });
+
+    const stillValid = await createApp(createTestEnv()).fetch(
+      request("/api/auth/session", { cookie }),
+      createTestEnv(),
+    );
+    expect(stillValid.status).toBe(200);
+  });
+
+  it("allows a same-origin logout with a matching Origin header", async () => {
+    const cookie = sessionCookieFrom(await login());
+
+    const response = await createApp(createTestEnv()).fetch(
+      request("/api/auth/logout", {
+        cookie,
+        headers: { Origin: "https://example.test" },
+        method: "POST",
+      }),
+      createTestEnv(),
+    );
+
+    expect(response.status).toBe(204);
+  });
+});
+
+describe("認証済みAPIのキャッシュ制御 (IPA 7.4章)", () => {
+  it("sets Cache-Control: no-store on the session response", async () => {
+    const cookie = sessionCookieFrom(await login());
+
+    const response = await createApp(createTestEnv()).fetch(
+      request("/api/auth/session", { cookie }),
+      createTestEnv(),
+    );
+
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("sets Cache-Control: no-store on the logout response", async () => {
+    const cookie = sessionCookieFrom(await login());
+
+    const response = await createApp(createTestEnv()).fetch(
+      request("/api/auth/logout", { cookie, method: "POST" }),
+      createTestEnv(),
+    );
+
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("sets Cache-Control: no-store on the login response", async () => {
+    const response = await login();
+
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("sets Cache-Control: no-store on an API error response", async () => {
+    const response = await login("admin@example.test", "wrong-password");
+
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+  });
 });
 
 /**

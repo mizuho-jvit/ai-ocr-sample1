@@ -10,6 +10,7 @@ import {
   type TenantRepository,
 } from "./db/repositories";
 import { type AppHonoEnv, sessionGuard } from "./middleware/auth";
+import { csrfGuard } from "./middleware/csrf";
 import { emitRequestLog } from "./observability/logger";
 import {
   createOperationTrace,
@@ -98,13 +99,48 @@ function errorResponse(error: unknown): Response {
   });
 }
 
+// クリックジャッキング対策(IPA「安全なウェブサイトの作り方」7.6章)に加え、
+// 本アプリが読み込むスクリプト・スタイル・接続先を自己オリジンのみへ制限し、
+// <object>/<base>タグの悪用を防ぐ(7.7章 XSSの多層防御)。本番ビルドはインライン
+// スクリプトや外部CDNを使用していないため、script-srcへの'unsafe-inline'等の緩和は不要。
+// img-src は帳票原本プレビュー用に data: (OCR直後の即時プレビュー)と
+// R2署名付きURL(申請詳細画面。image-storage.ts の *.r2.cloudflarestorage.com)を許可する。
+// style-src は React の style={{...}} が style 属性としてレンダリングされ、CSPの
+// style-src はインラインstyle属性にも適用されるため 'unsafe-inline' が必須(全画面で使用)。
+// <style>/style属性の注入はCSS injectionに限られスクリプト実行には至らないため、
+// script-src は 'self' のまま緩めない。
+//
+// isDevOnly(`vite build`では静的にfalseへ畳み込まれ、本番バンドルには現れない)の
+// 場合のみ script-src に 'unsafe-inline' を足す。`vite`(pnpm dev)は
+// @vitejs/plugin-react のFast Refreshプリアンブルをインラインscriptとしてindex.htmlへ
+// 注入するため、これが無いとローカル開発でログイン画面が真っ白になる
+// (`pnpm dev:remote`はビルド済み資産を配信するため本来この緩和は不要)。
+export function buildContentSecurityPolicy(isDevOnly: boolean): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self'${isDevOnly ? " 'unsafe-inline'" : ""}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https://*.r2.cloudflarestorage.com",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'self'",
+  ].join("; ");
+}
+
+const CONTENT_SECURITY_POLICY = buildContentSecurityPolicy(import.meta.env.DEV);
+
+function setSecurityHeaders(headers: Headers): void {
+  headers.set("X-Frame-Options", "SAMEORIGIN");
+  headers.set("Content-Security-Policy", CONTENT_SECURITY_POLICY);
+  // MIMEスニッフィング対策(IPA「安全なウェブサイトの作り方」7.7章)。
+  headers.set("X-Content-Type-Options", "nosniff");
+}
+
 function withRequestId(response: Response, requestId: string): Response {
   const headers = new Headers(response.headers);
   headers.set("X-Request-Id", requestId);
-  // クリックジャッキング対策(IPA「安全なウェブサイトの作り方」7.6章)。
-  // このアプリを他オリジンのiframeに埋め込む用途はなく、自己オリジンのみ許可する。
-  headers.set("X-Frame-Options", "SAMEORIGIN");
-  headers.set("Content-Security-Policy", "frame-ancestors 'self'");
+  setSecurityHeaders(headers);
   return new Response(response.body, {
     headers,
     status: response.status,
@@ -197,11 +233,16 @@ export function createApp(
       );
     } finally {
       context.header("X-Request-Id", trace.requestId);
-      // クリックジャッキング対策(IPA「安全なウェブサイトの作り方」7.6章)。
-      // withRequestId()側にも同じ設定があるが、成功パスはこのミドルウェアの
-      // context.header()を経由するため、ここでも同じ値を付与する。
+      // withRequestId()側にも同じセキュリティヘッダー設定があるが、成功パスは
+      // このミドルウェアのcontext.header()を経由するため、ここでも同じ値を付与する。
       context.header("X-Frame-Options", "SAMEORIGIN");
-      context.header("Content-Security-Policy", "frame-ancestors 'self'");
+      context.header("Content-Security-Policy", CONTENT_SECURITY_POLICY);
+      context.header("X-Content-Type-Options", "nosniff");
+      if (context.req.path.startsWith("/api/")) {
+        // 認証済みAPI・ログアウト応答をブラウザ/中間キャッシュへ残さない
+        // (IPA「安全なウェブサイトの作り方」7.4章)。静的アセットには適用しない。
+        context.header("Cache-Control", "no-store");
+      }
       if (!trace.failure) {
         finalizeOperationTrace(trace, "response.created");
       }
@@ -224,6 +265,9 @@ export function createApp(
   // 今後の業務API（/usage・/ocr/*・/applications/* など）はすべてここへ足す。
   const protectedApi = new Hono<AppHonoEnv>();
   protectedApi.use("*", sessionGuard());
+  // sessionGuard()より後段に置き、未認証リクエストは従来どおり401を返す
+  // (認証チェックの網羅性を検証するテストの前提を変えないため)。
+  protectedApi.use("*", csrfGuard());
   protectedApi.route("/auth", createProtectedAuthRoutes());
   protectedApi.route("/usage", createUsageRoutes());
   protectedApi.route("/ocr", createOcrRoutes());

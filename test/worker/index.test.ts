@@ -1,10 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 
-import worker, { createApp, type WorkerEnv } from "../../src/worker/index";
+import worker, {
+  buildContentSecurityPolicy,
+  createApp,
+  type WorkerEnv,
+} from "../../src/worker/index";
 
 const BASIC_AUTHORIZATION = `Basic ${btoa(
   "test-user:test-password-at-least-20-characters",
 )}`;
+
+// vitest-pool-workersはVite経由でモジュールを読むため import.meta.env.DEV は
+// 常に true (dev)。本番ビルド(`vite build`)ではこれが false へ静的に畳み込まれ
+// script-src から 'unsafe-inline' が消えることは buildContentSecurityPolicy() の
+// 単体テスト(index.csp.test.ts)側で直接検証する。
+const EXPECTED_CSP = buildContentSecurityPolicy(true);
+
+function expectSecurityHeaders(response: Response): void {
+  expect(response.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
+  expect(response.headers.get("Content-Security-Policy")).toBe(EXPECTED_CSP);
+  expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+}
 
 function createTestEnv(): WorkerEnv {
   return {
@@ -42,10 +58,7 @@ describe("Worker entry point", () => {
 
     expect(response.status).toBe(401);
     expect(response.headers.get("WWW-Authenticate")).toContain("Basic");
-    expect(response.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
-    expect(response.headers.get("Content-Security-Policy")).toBe(
-      "frame-ancestors 'self'",
-    );
+    expectSecurityHeaders(response);
   });
 
   it("delegates an authenticated request to the assets binding", async () => {
@@ -63,10 +76,7 @@ describe("Worker entry point", () => {
     await expect(response.text()).resolves.toBe("asset response");
     expect(env.ASSETS.fetch).toHaveBeenCalledOnce();
     expect(response.headers.get("X-Request-Id")).toBeTruthy();
-    expect(response.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
-    expect(response.headers.get("Content-Security-Policy")).toBe(
-      "frame-ancestors 'self'",
-    );
+    expectSecurityHeaders(response);
   });
 
   it("returns and logs a safe error when startup validation fails", async () => {
@@ -81,10 +91,7 @@ describe("Worker entry point", () => {
 
     expect(response.status).toBe(500);
     expect(response.headers.get("X-Request-Id")).toBeTruthy();
-    expect(response.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
-    expect(response.headers.get("Content-Security-Policy")).toBe(
-      "frame-ancestors 'self'",
-    );
+    expectSecurityHeaders(response);
     await expect(response.json()).resolves.toEqual({
       error: {
         code: "INTERNAL",
@@ -119,10 +126,7 @@ describe("Worker entry point", () => {
 
     expect(response.status).toBe(500);
     expect(response.headers.get("X-Request-Id")).toBeTruthy();
-    expect(response.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
-    expect(response.headers.get("Content-Security-Policy")).toBe(
-      "frame-ancestors 'self'",
-    );
+    expectSecurityHeaders(response);
     expect(await response.text()).not.toContain(secret);
     expect(logError).toHaveBeenCalledOnce();
     expect(JSON.stringify(logError.mock.calls[0]?.[0])).not.toContain(secret);
