@@ -12,8 +12,8 @@ importers:
         specifier: 0.45.2
         version: 0.45.2
       hono:
-        specifier: 4.12.34
-        version: 4.12.34
+        specifier: 4.13.7
+        version: 4.13.7
       react:
         specifier: 19.2.1
         version: 19.2.1
@@ -1598,8 +1598,8 @@ packages:
     resolution: {integrity: sha512-7uMYJu2SEwwL8vVcKp0C0lnt6d2LSGGe+T+oY79PiCJNNSgFpbxW8n5KuzpDQvrU4mt+fYiK1+Jy7Z2v39YR6g==}
     engines: {node: '>=20.0.0'}
 
-  hono@4.12.34:
-    resolution: {integrity: sha512-GqXJqY/xJkJmuloTrnV1ZEXG3fqte+VjkUqoRNZXcrUidiUOP4fMSIHHY4tsqZBK++kVyWmt/AAfSUuy57/eSA==}
+  hono@4.13.7:
+    resolution: {integrity: sha512-c8/gF9ac8Y78/agExVocyLevgR+JlpNB444Py0FSX8pJoPdYUfUzRcXtYEYGwt6l19qIlVZPN5Mfsw9jFShmQQ==}
     engines: {node: '>=16.9.0'}
 
   js-tokens@4.0.0:
@@ -3037,7 +3037,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  hono@4.12.34: {}
+  hono@4.13.7: {}
 
   js-tokens@4.0.0: {}
 
