@@ -3,7 +3,7 @@ type: requirement
 title: 運用要件（単一デモ環境・開発検証）
 description: 単一デモ環境、MVP 1.0／1.1のOCR設定、Document AIの権限・費用監視、シード投入、開発検証
 tags: [ai-ocr, operations, deployment, seed, cloudflare, document-ai]
-timestamp: 2026-09-18T00:00:00Z
+timestamp: 2026-09-18T12:00:00Z
 ---
 
 # 運用要件（単一デモ環境・開発検証）
@@ -60,7 +60,10 @@ timestamp: 2026-09-18T00:00:00Z
 - **本番反映前のステージング確認（ワンクッション）は設けない。** 営業デモ用の単一環境であり、`release` へマージした内容がそのままCloudflareへ出る。
 - **リリース後に過去バージョンだけを緊急修正する場合は、`release` ブランチ側で直接修正し、修正後に `main` へも反映する。**
 - 現時点で `.github/workflows/ci.yml` は `main` へのpush/PRでlint・test・buildのみを実行し、デプロイジョブは含まれていない。**将来デプロイを自動化する際は、`release` へのpushを契機にする**（`main` へのpushでは動かさない）。
-- 本番用のCloudflare前提（本番D1データベースの実体、R2バケットの実体、GitHub Actions用Cloudflare APIトークンのSecrets登録）は本書作成時点で未整備。デプロイ自動化に着手する前に確認する。
+- 本番用のCloudflare前提の整備状況（2026-09-18時点）:
+  - **本番D1データベース(`ai-ocr-sample1`)を作成済み。** `wrangler.toml`の`database_id`を実際の値へ反映し、`wrangler d1 migrations apply DB --remote`でマイグレーション4件・`wrangler d1 execute DB --remote --file=scripts/db/seed.sql`でデモ用シード(テナント1件・職員2件・会員5件)を投入済み
+  - **R2バケット(`ai-ocr-sample1-images`)を作成済み。** 事前にCloudflareダッシュボードでアカウント側のR2機能自体を有効化する必要があった（未有効化のアカウントでは`wrangler r2 bucket list`等が`[code: 10042]`で失敗する）
+  - **GitHub Actions用のCloudflare APIトークンはSecretsに未登録。** デプロイ自動化に着手する前に、Cloudflareダッシュボードでスコープを絞ったAPIトークンを発行し、当該リポジトリのSettings→Secrets and variables→Actionsへ登録する必要がある
 
 ### リリース手順（main → release マージ）
 

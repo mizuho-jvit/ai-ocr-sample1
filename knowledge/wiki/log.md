@@ -4,6 +4,14 @@
 
 ## 2026-09-18
 
+### 本番Cloudflareリソース(D1・R2)を作成し、GitHub Secretsの未整備を確認した
+
+- **本番D1データベース(`ai-ocr-sample1`)を作成した。** `wrangler d1 create ai-ocr-sample1`で発行された`database_id`（`f8f103b4-e477-4884-bf71-bb01a7a8021a`）を`wrangler.toml`のゼロUUID仮値へ反映した。続けて`wrangler d1 migrations apply DB --remote`でマイグレーション4件（18コマンド）、`wrangler d1 execute DB --remote --file=scripts/db/seed.sql`でデモ用シード（テナント1件・職員2件・会員5件、計8クエリ）を投入し、いずれも成功した。
+- **R2バケット(`ai-ocr-sample1-images`)を作成した。** `wrangler r2 bucket list`が`[code: 10042] Please enable R2 through the Cloudflare Dashboard.`で失敗したため、まずCloudflareダッシュボードでアカウント側のR2機能自体を有効化する必要があると判明した（バケット作成以前に、アカウント単位でR2という製品自体を有効化する手続きが要る）。有効化後、`wrangler r2 bucket create ai-ocr-sample1-images`で作成した。
+- **GitHub Secretsを確認した結果、Cloudflare APIトークンは未登録だった。** デプロイ自動化（`release`ブランチへのpushを契機にするGitHub Actionsジョブ）に着手する前に、スコープを絞ったAPIトークンの発行とSecrets登録が必要。
+- これらの作業（`wrangler login`を含む）はCloudflareアカウントの資格情報を要するため、すべてユーザー自身の端末で実行した。エージェント側でログイン・トークンの代理操作は行わない方針とした（資格情報をチャット履歴に持ち込むこと自体がリスクであるため）。
+- `wrangler.toml`の`database_id`更新は`main`へコミット済み（コミット`34dfc26`）。`knowledge/wiki/requirements/operations.md`のデプロイ運用セクションに整備状況を反映した。
+
 ### releaseブランチを作成し、main→releaseのマージ手順を確立した
 
 - 決定#53に基づき、`release`ブランチを`main`（`f31c608`）と同一地点に作成し、`origin`へpushした。以後、Cloudflareへの実デプロイ対象は`release`ブランチとする。
