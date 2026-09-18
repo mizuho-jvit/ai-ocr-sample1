@@ -59,12 +59,12 @@ timestamp: 2026-09-18T12:00:00Z
 - **Cloudflareへの実デプロイ対象は `release` ブランチとする。** `main` は開発を継続する場所のまま変えず、リリース準備が整った時点で `main` の内容を `release` へマージしたときだけ本番へ反映する。
 - **本番反映前のステージング確認（ワンクッション）は設けない。** 営業デモ用の単一環境であり、`release` へマージした内容がそのままCloudflareへ出る。
 - **リリース後に過去バージョンだけを緊急修正する場合は、`release` ブランチ側で直接修正し、修正後に `main` へも反映する。**
-- 現時点で `.github/workflows/ci.yml` は `main` へのpush/PRでlint・test・buildのみを実行し、デプロイジョブは含まれていない。**将来デプロイを自動化する際は、`release` へのpushを契機にする**（`main` へのpushでは動かさない）。
+- `.github/workflows/ci.yml` は `main` へのpush/PRでlint・test・buildのみを実行する（デプロイは行わない）。**`.github/workflows/deploy.yml` が `release` へのpushを契機にデプロイを実行する**（`main` へのpushでは動かさない）。依存監査・lint・test・buildを`ci.yml`と同じ内容で独立に再実行してから`pnpm run deploy`（`wrangler deploy`）を呼ぶ。外部の`cloudflare/wrangler-action`は使わず、既存のdevDependencyの`wrangler`をそのまま使う（新規の外部Action依存を増やさないため）。
 - 本番用のCloudflare前提の整備状況（2026-09-18時点）:
   - **本番D1データベース(`ai-ocr-sample1`)を作成済み。** `wrangler.toml`の`database_id`を実際の値へ反映し、`wrangler d1 migrations apply DB --remote`でマイグレーション4件・`wrangler d1 execute DB --remote --file=scripts/db/seed.sql`でデモ用シード(テナント1件・職員2件・会員5件)を投入済み
   - **R2バケット(`ai-ocr-sample1-images`)を作成済み。** 事前にCloudflareダッシュボードでアカウント側のR2機能自体を有効化する必要があった（未有効化のアカウントでは`wrangler r2 bucket list`等が`[code: 10042]`で失敗する）
   - **GitHub Actions用のCloudflare APIトークンを登録済み。** Cloudflareダッシュボードで「Edit Cloudflare Workers」テンプレート（Account Resourcesは対象アカウントのみ、Zone Resourcesは「アカウントにあるすべてのゾーン」で対象アカウントのみに限定。独自ドメインを使わずゾーン権限自体は実質未使用）でトークンを発行し、当該リポジトリのSecretsへ`CLOUDFLARE_API_TOKEN`・`CLOUDFLARE_ACCOUNT_ID`として登録した。**トークンの値自体はこのwiki・チャットのいずれにも記録しない**（登録済みという事実のみ記録する）
-  - 以上でデプロイ自動化に必要なCloudflare側の前提はすべて整った。次は`release`ブランチへのpushを契機にデプロイするGitHub Actionsのワークフローを実装する
+  - 以上でデプロイ自動化に必要なCloudflare側の前提が整い、`.github/workflows/deploy.yml`を実装した
 
 ### リリース手順（main → release マージ）
 

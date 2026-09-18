@@ -4,6 +4,13 @@
 
 ## 2026-09-18
 
+### releaseブランチへのpushでデプロイするGitHub Actionsワークフローを実装した
+
+- **`.github/workflows/deploy.yml`を新設した。** `release`ブランチへのpushのみを契機にする(`main`へのpushでは動かない。既存の`ci.yml`と役割を分離)。`ci.yml`と同じ検証手順(`pnpm audit --prod --audit-level=high`・`pnpm lint`・`pnpm test`・`pnpm build`)をこのワークフロー内でも独立に実行してから、`pnpm run deploy`(`wrangler deploy`)で本番へ反映する。「mainがgreenだったから安全」に頼らず、実際にデプロイするコミット自体を検証する。
+- **外部の`cloudflare/wrangler-action`は使わず、既存のdevDependency`wrangler`と既存の`pnpm run deploy`スクリプトをそのまま使う構成にした。** 直近のコミット(サプライチェーン対策)の方針に合わせ、新しい外部Action依存を増やさない判断。認証情報は`CLOUDFLARE_API_TOKEN`・`CLOUDFLARE_ACCOUNT_ID`をSecretsから環境変数として渡す。
+- マイグレーション・シード投入はこのワークフローに含めない。DBスキーマ変更は引き続き手動で意図的に実行する。
+- `knowledge/wiki/requirements/operations.md`のデプロイ運用セクションを更新した。
+
 ### GitHub SecretsへCloudflare APIトークンを登録し、デプロイ自動化の前提が揃った
 
 - Cloudflareダッシュボードで「Edit Cloudflare Workers」テンプレート(最小権限)を使い、Account Resourcesを対象アカウントのみ、Zone Resourcesを「アカウントにあるすべてのゾーン」で同アカウントのみに限定してAPIトークンを発行した。「すべてのゾーン」(他アカウントも含む最も広い範囲)は選ばなかった。
