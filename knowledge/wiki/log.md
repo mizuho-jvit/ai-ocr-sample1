@@ -4,6 +4,12 @@
 
 ## 2026-09-18
 
+### releaseブランチを作成し、main→releaseのマージ手順を確立した
+
+- 決定#53に基づき、`release`ブランチを`main`（`f31c608`）と同一地点に作成し、`origin`へpushした。以後、Cloudflareへの実デプロイ対象は`release`ブランチとする。
+- **リリースのたびに`main`の内容を`release`へマージする手順を`operations.md`に文書化した。** `git checkout release && git pull && git merge main && git push`という順序で、`merge`を使い`rebase`は使わない（共有ブランチへのrebaseはforce pushが必要になりやすく事故りやすいため）。`release`側で緊急修正した場合は同じ手順（ステップ4のmerge）で自然に`main`へ合流する。
+- git操作（ブランチ作成・コミット・push）は実施済み。GitHub Actionsでの自動デプロイ（`release`へのpush契機）は未着手（[運用要件](./requirements/operations.md#デプロイ運用リリースブランチ実装時判断)に前提未整備の旨を記載済み）。
+
 ### Cloudflareへのリリース運用（ブランチ戦略）を確定した（決定#53）
 
 - **`release`ブランチを新設し、Cloudflareへの実デプロイ対象とする方針を確定した。** `main`は開発を継続する場所のまま変えず、リリース準備が整った時点で`main`の内容を`release`へマージしたときだけ本番へ反映する。過去のリリース版だけを緊急に個別修正したい場合は`release`ブランチ側で直接修正し、後で`main`へも反映する。

@@ -62,6 +62,36 @@ timestamp: 2026-09-18T00:00:00Z
 - 現時点で `.github/workflows/ci.yml` は `main` へのpush/PRでlint・test・buildのみを実行し、デプロイジョブは含まれていない。**将来デプロイを自動化する際は、`release` へのpushを契機にする**（`main` へのpushでは動かさない）。
 - 本番用のCloudflare前提（本番D1データベースの実体、R2バケットの実体、GitHub Actions用Cloudflare APIトークンのSecrets登録）は本書作成時点で未整備。デプロイ自動化に着手する前に確認する。
 
+### リリース手順（main → release マージ）
+
+リリースのたびに、以下の手順で `main` の内容を `release` へ反映する。
+
+```sh
+# 1. mainを最新化する
+git checkout main
+git pull origin main
+
+# 2. mainのCI（.github/workflows/ci.yml）が green であることを確認する
+
+# 3. releaseブランチへ切り替え、最新化する
+git checkout release
+git pull origin release
+
+# 4. mainの内容をreleaseへ取り込む
+git merge main
+
+# 5. コンフリクトが無ければそのままpush。コンフリクトが出た場合は該当ファイルを直してから
+#    git add <直したファイル> → git commit → push する
+git push origin release
+
+# 6. 作業をmainへ戻す
+git checkout main
+```
+
+- **`merge` を使い `rebase` は使わない。** `rebase` は履歴を書き換えるため、共有ブランチ（`release`）に対して行うと force push が必要になりやすく事故りやすい。`merge` の方が安全で、Git操作に不慣れな体制でも扱いやすい
+- push前に必ずCIが緑であることを確認する
+- `release` ブランチ側で緊急修正（直接コミット）を行った場合、このステップ4で修正コミットが自然に `main` へ合流する。逆に修正を先に `main` へ反映したい場合は `git checkout main && git merge release` で取り込む
+
 ## 関連ページ
 
 - [機能要件 F-9 デモデータのリセット](./functional.md#f-9-デモデータのリセットadmin-のみ)
