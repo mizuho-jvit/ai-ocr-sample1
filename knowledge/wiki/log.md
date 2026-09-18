@@ -4,6 +4,13 @@
 
 ## 2026-09-18
 
+### F-6-8「別人として登録」ボタンを一時的に非表示にし、新規会員作成を伴うかの論点を未確定事項として記録した
+
+- **業務チェック後の名寄せ候補カード（`match-candidate-card.tsx`）の「別人として登録」ボタンを一時的に非表示にした。** 実装は削除せず、コメントアウトで残した。押下しても`decideMatch`は`MatchCandidate.status`を`rejected`にするだけで新規会員を作成しない挙動と、要件上の期待（新規会員作成を伴うか）が未確定であることが、ユーザーからの「別人として登録で新規会員登録されない。仕様変更した気がする」という指摘の調査で判明した。調査の結果、最近の仕様変更でスキップされるようになったのではなく、Task 010導入（2026-09-04）時点から一貫してこの挙動であり、当初から未実装だったと確認した。
+- **論点自体は要件定義レビュー時点（`knowledge/ref/doc/要件定義codexレビュー_20260814.md` R-03）から指摘されていたが、正式な決定として解決されないまま実装が進んでいた。** 旧プロトタイプ（`knowledge/ref/doc/ai-ocr-demo.jsx`）には「新規会員(申請中)として登録」という文言があり、当初の意図は会員作成を伴っていた可能性が高い。
+- 結論は出さず、`requirements/decisions.md`に「検討中の論点（未確定）」節を新設しTBD-1として記録した。`requirements/functional.md`のF-6-8直後にも同じ論点への注記を追加した。`requirements/index.md`の「未確定事項なし」の宣言にこの1点を唯一の例外として明記した。
+- 反映先: `requirements/decisions.md`（検討中の論点TBD-1）、`requirements/functional.md`（F-6-8注記）、`requirements/index.md`、`src/react-app/components/match-candidate-card.tsx`。
+
 ### releaseブランチへのpushでデプロイするGitHub Actionsワークフローを実装した
 
 - **`.github/workflows/deploy.yml`を新設した。** `release`ブランチへのpushのみを契機にする(`main`へのpushでは動かない。既存の`ci.yml`と役割を分離)。`ci.yml`と同じ検証手順(`pnpm audit --prod --audit-level=high`・`pnpm lint`・`pnpm test`・`pnpm build`)をこのワークフロー内でも独立に実行してから、`pnpm run deploy`(`wrangler deploy`)で本番へ反映する。「mainがgreenだったから安全」に頼らず、実際にデプロイするコミット自体を検証する。

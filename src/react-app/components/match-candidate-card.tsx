@@ -66,8 +66,13 @@ export interface MatchCandidateCardProps {
 
 /**
  * 🔵 Intent: F-6-7の候補カードUI。申請データと会員データを左右に並べて差分をハイライトし、
- * F-6-8の3操作（同一人物として紐付け・別人として登録・保留）を提供する。
+ * F-6-8の操作（同一人物として紐付け・保留）を提供する。
  * `merged`済みの候補は確定済みの紐付けとして再判断ボタンを出さない。
+ *
+ * 🟡 Intent: 「別人として登録」ボタンは一時的に非表示（ユーザー判断）。押下してもR2/D1へ
+ * 新規会員は作成されず候補が`rejected`になるだけの挙動と、要件上の期待
+ * （新規会員作成を伴うか）が未確定のため。詳細と再検討方針は
+ * knowledge/wiki/requirements/decisions.md の該当決定を参照。
  */
 export function MatchCandidateCard({
   application,
@@ -166,6 +171,11 @@ export function MatchCandidateCard({
           >
             同一人物として紐付け
           </button>
+          {/*
+            🟡 Intent: 「別人として登録」ボタンは一時的に非表示（ユーザー判断）。押下しても
+            新規会員は作成されず候補が`rejected`になるだけの挙動と、要件上の期待（新規会員
+            作成を伴うか）が未確定のため。詳細と再検討方針は
+            knowledge/wiki/requirements/decisions.md の該当決定を参照。
           <button
             className="btn btn-ghost btn-small"
             disabled={isDeciding}
@@ -174,6 +184,7 @@ export function MatchCandidateCard({
           >
             別人として登録
           </button>
+          */}
           <button
             className="btn btn-ghost btn-small"
             disabled={isDeciding}
