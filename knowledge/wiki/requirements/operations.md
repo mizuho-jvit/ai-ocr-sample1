@@ -3,7 +3,7 @@ type: requirement
 title: 運用要件（単一デモ環境・開発検証）
 description: 単一デモ環境、MVP 1.0／1.1のOCR設定、Document AIの権限・費用監視、シード投入、開発検証
 tags: [ai-ocr, operations, deployment, seed, cloudflare, document-ai]
-timestamp: 2026-08-20T00:00:00Z
+timestamp: 2026-09-18T00:00:00Z
 ---
 
 # 運用要件（単一デモ環境・開発検証）
@@ -52,9 +52,20 @@ timestamp: 2026-08-20T00:00:00Z
 | OP-7 | デモ用シードデータ（職員2件・会員5件）を投入するスクリプトを用意する |
 | OP-10 | シード投入時、会員には **`isSeed = true`** を設定する（F-9-2 の判定に使用）。`id` はスクリプト内の固定値とし、実行のたびに採番しない（DB再構築時にデモ手順書のURLが変わらないようにするため） |
 
+## デプロイ運用（リリースブランチ、実装時判断）
+
+要件定義にはCI/CDのブランチ運用の定めが無く、実装時の判断として以下のとおり確定した（[判断記録 #53](./decisions.md#確定事項)）。
+
+- **Cloudflareへの実デプロイ対象は `release` ブランチとする。** `main` は開発を継続する場所のまま変えず、リリース準備が整った時点で `main` の内容を `release` へマージしたときだけ本番へ反映する。
+- **本番反映前のステージング確認（ワンクッション）は設けない。** 営業デモ用の単一環境であり、`release` へマージした内容がそのままCloudflareへ出る。
+- **リリース後に過去バージョンだけを緊急修正する場合は、`release` ブランチ側で直接修正し、修正後に `main` へも反映する。**
+- 現時点で `.github/workflows/ci.yml` は `main` へのpush/PRでlint・test・buildのみを実行し、デプロイジョブは含まれていない。**将来デプロイを自動化する際は、`release` へのpushを契機にする**（`main` へのpushでは動かさない）。
+- 本番用のCloudflare前提（本番D1データベースの実体、R2バケットの実体、GitHub Actions用Cloudflare APIトークンのSecrets登録）は本書作成時点で未整備。デプロイ自動化に着手する前に確認する。
+
 ## 関連ページ
 
 - [機能要件 F-9 デモデータのリセット](./functional.md#f-9-デモデータのリセットadmin-のみ)
 - [非機能要件](./non-functional.md)
 - [テナント分離](./tenant-isolation.md)
 - [システム構成](../architecture/cloudflare-stack.md)
+- [判断記録 #53](./decisions.md#確定事項)
