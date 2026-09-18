@@ -4,6 +4,12 @@
 
 ## 2026-09-18
 
+### GitHub SecretsへCloudflare APIトークンを登録し、デプロイ自動化の前提が揃った
+
+- Cloudflareダッシュボードで「Edit Cloudflare Workers」テンプレート(最小権限)を使い、Account Resourcesを対象アカウントのみ、Zone Resourcesを「アカウントにあるすべてのゾーン」で同アカウントのみに限定してAPIトークンを発行した。「すべてのゾーン」(他アカウントも含む最も広い範囲)は選ばなかった。
+- GitHubの当該リポジトリのSettings→Secrets and variables→Actionsへ`CLOUDFLARE_API_TOKEN`・`CLOUDFLARE_ACCOUNT_ID`として登録した。**トークンの値そのものはこのチャット・wikiのいずれにも記録していない。**
+- これで本番D1・R2バケット・GitHub Secretsの3点すべてが整備済みとなり、デプロイ自動化(GitHub Actions)に着手できる状態になった。
+
 ### 本番Cloudflareリソース(D1・R2)を作成し、GitHub Secretsの未整備を確認した
 
 - **本番D1データベース(`ai-ocr-sample1`)を作成した。** `wrangler d1 create ai-ocr-sample1`で発行された`database_id`（`f8f103b4-e477-4884-bf71-bb01a7a8021a`）を`wrangler.toml`のゼロUUID仮値へ反映した。続けて`wrangler d1 migrations apply DB --remote`でマイグレーション4件（18コマンド）、`wrangler d1 execute DB --remote --file=scripts/db/seed.sql`でデモ用シード（テナント1件・職員2件・会員5件、計8クエリ）を投入し、いずれも成功した。

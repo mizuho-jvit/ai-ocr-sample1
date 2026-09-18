@@ -63,7 +63,8 @@ timestamp: 2026-09-18T12:00:00Z
 - 本番用のCloudflare前提の整備状況（2026-09-18時点）:
   - **本番D1データベース(`ai-ocr-sample1`)を作成済み。** `wrangler.toml`の`database_id`を実際の値へ反映し、`wrangler d1 migrations apply DB --remote`でマイグレーション4件・`wrangler d1 execute DB --remote --file=scripts/db/seed.sql`でデモ用シード(テナント1件・職員2件・会員5件)を投入済み
   - **R2バケット(`ai-ocr-sample1-images`)を作成済み。** 事前にCloudflareダッシュボードでアカウント側のR2機能自体を有効化する必要があった（未有効化のアカウントでは`wrangler r2 bucket list`等が`[code: 10042]`で失敗する）
-  - **GitHub Actions用のCloudflare APIトークンはSecretsに未登録。** デプロイ自動化に着手する前に、Cloudflareダッシュボードでスコープを絞ったAPIトークンを発行し、当該リポジトリのSettings→Secrets and variables→Actionsへ登録する必要がある
+  - **GitHub Actions用のCloudflare APIトークンを登録済み。** Cloudflareダッシュボードで「Edit Cloudflare Workers」テンプレート（Account Resourcesは対象アカウントのみ、Zone Resourcesは「アカウントにあるすべてのゾーン」で対象アカウントのみに限定。独自ドメインを使わずゾーン権限自体は実質未使用）でトークンを発行し、当該リポジトリのSecretsへ`CLOUDFLARE_API_TOKEN`・`CLOUDFLARE_ACCOUNT_ID`として登録した。**トークンの値自体はこのwiki・チャットのいずれにも記録しない**（登録済みという事実のみ記録する）
+  - 以上でデプロイ自動化に必要なCloudflare側の前提はすべて整った。次は`release`ブランチへのpushを契機にデプロイするGitHub Actionsのワークフローを実装する
 
 ### リリース手順（main → release マージ）
 
