@@ -22,8 +22,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "ai-ocr-sample1"
-# D1作成後に実際のIDへ置き換える。ゼロUUIDはローカル開発専用の仮値。
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "f8f103b4-e477-4884-bf71-bb01a7a8021a"
 migrations_dir = "drizzle"
 
 [[r2_buckets]]
